@@ -1,7 +1,7 @@
 package com.artemka091102.explosion;
 
-import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -29,11 +29,12 @@ public class EventsHandler {
 	//ЛОГГЕР
 	static final Logger LOGGER = LogManager.getLogger();
 	
+	//ОБРАБОТЧИК ВЗРЫВА
 	@SubscribeEvent
 	public static void explosion(ExplosionEvent event) {
 	    World world = event.getWorld();
 	    List<BlockPos> blocksPos = event.getExplosion().getAffectedBlockPositions();
-	    List<BlockPos> exploded = new ArrayList<>();
+	    HashSet<Triple> exploded = new HashSet<Triple>();
 	    for (BlockPos blockPos : blocksPos) {
 	        blockReplace(world, blockPos, exploded, false);
 	        blockReplace(world, blockPos.east(), exploded, true);
@@ -45,19 +46,21 @@ public class EventsHandler {
 	    }
 	}
 
-	public static void blockReplace(World world, BlockPos blockPos, List<BlockPos> exploded, boolean check) {
-	    if (check) {
-	        for (BlockPos pos : exploded) {
-	            if (pos.getX() == blockPos.getX() && pos.getY() == blockPos.getY() && pos.getZ() == blockPos.getZ())
-	                return;
-	        }
-	    }
+	//ЗАМЕНА БЛОКОВ
+	public static void blockReplace(World world, BlockPos blockPos, HashSet<Triple> exploded, boolean check) {
+		Triple tripleBlockPos = blockPosToTriple(blockPos);
+		if (check && exploded.contains(tripleBlockPos)) return;
+	    exploded.add(tripleBlockPos);
 	    if (world.getRandom().nextFloat() < 0.4F) return;
-	    exploded.add(blockPos);
 	    BlockState blockState = crackedDictionary.get(world.getBlockState(blockPos).getBlock().getRegistryName().toString());
 	    if (blockState != null) {
 	    	world.setBlockState(blockPos, blockState);
 	    }
+	}
+	
+	//ПРЕВРАЩЕНИЕ BLOCKPOS В TRIPLE
+	public static Triple blockPosToTriple(BlockPos blockPos) {
+		return new Triple(blockPos.getX(), blockPos.getY(), blockPos.getZ());
 	}
 	
 	//ДОБАВЛЕНИЕ СООТВЕТСТВИЙ БЛОКОВ В СЛОВАРЬ И ПРОВЕРКА НА СУЩЕСТВОВАНИЕ БЛОКА
