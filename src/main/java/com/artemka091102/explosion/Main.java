@@ -3,9 +3,9 @@ package com.artemka091102.explosion;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 
-@Mod(Explosion.MODID)
-public class Explosion {
-	public Explosion() {
+@Mod(Main.MODID)
+public class Main {
+	public Main() {
         FMLJavaModLoadingContext.get().getModEventBus().addListener(EventsHandler::onCommonSetup);
     }
 

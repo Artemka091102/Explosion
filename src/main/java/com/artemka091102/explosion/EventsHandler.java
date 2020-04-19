@@ -1,5 +1,6 @@
 package com.artemka091102.explosion;
 
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -11,8 +12,10 @@ import org.apache.logging.log4j.Logger;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
+import net.minecraft.entity.item.TNTEntity;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.Explosion;
 import net.minecraft.world.World;
 import net.minecraftforge.event.world.ExplosionEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -20,7 +23,7 @@ import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.minecraftforge.fml.event.lifecycle.FMLLoadCompleteEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 
-@EventBusSubscriber(modid = Explosion.MODID, bus=EventBusSubscriber.Bus.FORGE)
+@EventBusSubscriber(modid = Main.MODID, bus=EventBusSubscriber.Bus.FORGE)
 public class EventsHandler {
 	
 	//СЛОВАРЬ СООТВЕТСТВИЙ БЛОКОВ
@@ -32,6 +35,19 @@ public class EventsHandler {
 	//ОБРАБОТЧИК ВЗРЫВА
 	@SubscribeEvent
 	public static void explosion(ExplosionEvent event) {
+		
+		//ПОЛУЧЕНИЕ ИСТОЧНИКА ВЗРЫВА И ВКЛЮЧЕНИЕ ОГНЯ У TNT
+        try {
+        	Field exploder = Explosion.class.getDeclaredField("exploder");
+            Field causesFire = Explosion.class.getDeclaredField("causesFire");
+            exploder.setAccessible(true);
+            causesFire.setAccessible(true);
+            if (exploder.get(event.getExplosion()) instanceof TNTEntity) {
+            	causesFire.setBoolean(event.getExplosion(), true);
+            }
+        } catch(Throwable e) {}
+		
+		//ОБРАБОТКА БЛОКОВ ПЕРЕД ВЗРЫВОМ
 	    World world = event.getWorld();
 	    List<BlockPos> blocksPos = event.getExplosion().getAffectedBlockPositions();
 	    HashSet<Triple> exploded = new HashSet<Triple>();
@@ -53,9 +69,7 @@ public class EventsHandler {
 	    exploded.add(tripleBlockPos);
 	    if (world.getRandom().nextFloat() < 0.4F) return;
 	    BlockState blockState = crackedDictionary.get(world.getBlockState(blockPos).getBlock().getRegistryName().toString());
-	    if (blockState != null) {
-	    	world.setBlockState(blockPos, blockState);
-	    }
+	    if (blockState != null) world.setBlockState(blockPos, blockState);
 	}
 	
 	//ПРЕВРАЩЕНИЕ BLOCKPOS В TRIPLE
@@ -66,7 +80,8 @@ public class EventsHandler {
 	//ДОБАВЛЕНИЕ СООТВЕТСТВИЙ БЛОКОВ В СЛОВАРЬ И ПРОВЕРКА НА СУЩЕСТВОВАНИЕ БЛОКА
 	public static void putToDictionary(String oldBlockRegName, String newBlockRegName) {
 		Block newBlock = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(newBlockRegName));
-		if (newBlock != Blocks.AIR) {
+		Block oldBlock = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(oldBlockRegName));
+		if (newBlock != Blocks.AIR && oldBlock != Blocks.AIR) {
 			crackedDictionary.put(oldBlockRegName, newBlock.getDefaultState());
 		}
 	}
@@ -74,8 +89,6 @@ public class EventsHandler {
 	//ДОБАВЛЕНИЕ СООТВЕТСТВИЙ БЛОКОВ В СЛОВАРЬ ПРИ ЗАГРУЗКЕ МАЙНКРАФТА
 	@SubscribeEvent
 	public static void onCommonSetup(FMLLoadCompleteEvent event) {
-		putToDictionary("minecraft:air", "minecraft:fire");
-		
 		putToDictionary("wildnature:basalt_slab", "wildnature:basalt_slab_cobble");
 		putToDictionary("wildnature:basalt_slab_bricks", "wildnature:basalt_slab_bricks_cracked");
 		putToDictionary("wildnature:basalt_slab_bricks_cracked", "wildnature:basalt_slab_cobble");
