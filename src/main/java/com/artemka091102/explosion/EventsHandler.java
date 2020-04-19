@@ -32,18 +32,27 @@ public class EventsHandler {
 	//ЛОГГЕР
 	static final Logger LOGGER = LogManager.getLogger();
 	
+	//БУДЕТ ЛИ ОТ ВЗРЫВА ОГОНЬ?
+	static boolean willFireBe = false;
+	
 	//ОБРАБОТЧИК ВЗРЫВА
 	@SubscribeEvent
 	public static void explosion(ExplosionEvent event) {
 		
-		//ПОЛУЧЕНИЕ ИСТОЧНИКА ВЗРЫВА И ВКЛЮЧЕНИЕ ОГНЯ У TNT
+		//ПОЛУЧЕНИЕ ИСТОЧНИКА ВЗРЫВА
         try {
         	Field exploder = Explosion.class.getDeclaredField("exploder");
-            Field causesFire = Explosion.class.getDeclaredField("causesFire");
+        	Field causesFire = Explosion.class.getDeclaredField("causesFire");
             exploder.setAccessible(true);
             causesFire.setAccessible(true);
+            //ЕСЛИ ЭТО ДИНАМИТ - ОГОНЬ БУДЕТ
             if (exploder.get(event.getExplosion()) instanceof TNTEntity) {
-            	causesFire.setBoolean(event.getExplosion(), true);
+            	willFireBe = true;
+            }
+            //ЕСЛИ У ЭТОГО ЕСТЬ ОГОНЬ В ВАНИЛИ - ОГОНЬ БУДЕТ, НО НЕ ВАНИЛЬНЫЙ
+            if (causesFire.getBoolean(event.getExplosion())) {
+            	willFireBe = true;
+            	causesFire.setBoolean(event.getExplosion(), false);
             }
         } catch(Throwable e) {}
 		
@@ -60,6 +69,9 @@ public class EventsHandler {
 	        blockReplace(world, blockPos.up(), exploded, true);
 	        blockReplace(world, blockPos.down(), exploded, true);
 	    }
+	    
+	    //НЕ ЗАБЫВАЕМ ОТКЛЮЧИТЬ ОГОНЬ ДЛЯ СЛЕДУЮЩЕГО ВЗРЫВА
+	    willFireBe = false;
 	}
 
 	//ЗАМЕНА БЛОКОВ
@@ -69,7 +81,10 @@ public class EventsHandler {
 	    exploded.add(tripleBlockPos);
 	    if (world.getRandom().nextFloat() < 0.4F) return;
 	    BlockState blockState = crackedDictionary.get(world.getBlockState(blockPos).getBlock().getRegistryName().toString());
-	    if (blockState != null) world.setBlockState(blockPos, blockState);
+	    if (blockState != null) {
+		    if (blockState == Blocks.FIRE.getDefaultState() && willFireBe) world.setBlockState(blockPos, blockState);
+		    else if (blockState != Blocks.FIRE.getDefaultState()) world.setBlockState(blockPos, blockState);
+	    }
 	}
 	
 	//ПРЕВРАЩЕНИЕ BLOCKPOS В TRIPLE
@@ -80,8 +95,7 @@ public class EventsHandler {
 	//ДОБАВЛЕНИЕ СООТВЕТСТВИЙ БЛОКОВ В СЛОВАРЬ И ПРОВЕРКА НА СУЩЕСТВОВАНИЕ БЛОКА
 	public static void putToDictionary(String oldBlockRegName, String newBlockRegName) {
 		Block newBlock = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(newBlockRegName));
-		Block oldBlock = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(oldBlockRegName));
-		if (newBlock != Blocks.AIR && oldBlock != Blocks.AIR) {
+		if (newBlock != Blocks.AIR) {
 			crackedDictionary.put(oldBlockRegName, newBlock.getDefaultState());
 		}
 	}
@@ -89,6 +103,8 @@ public class EventsHandler {
 	//ДОБАВЛЕНИЕ СООТВЕТСТВИЙ БЛОКОВ В СЛОВАРЬ ПРИ ЗАГРУЗКЕ МАЙНКРАФТА
 	@SubscribeEvent
 	public static void onCommonSetup(FMLLoadCompleteEvent event) {
+		putToDictionary("minecraft:air", "minecraft:fire");
+		
 		putToDictionary("wildnature:basalt_slab", "wildnature:basalt_slab_cobble");
 		putToDictionary("wildnature:basalt_slab_bricks", "wildnature:basalt_slab_bricks_cracked");
 		putToDictionary("wildnature:basalt_slab_bricks_cracked", "wildnature:basalt_slab_cobble");
@@ -320,6 +336,8 @@ public class EventsHandler {
 		putToDictionary("wildnature:slate_roof_stairs", "wildnature:slate_stairs_cobble");
 		putToDictionary("wildnature:slate_trapdoor", "wildnature:slate_cobble_trapdoor");
 		putToDictionary("wildnature:slate_fence", "wildnature:slate_cobble_fence");
+		
+		putToDictionary("wildnature:overgrown_stone", "minecraft:mossy_cobblestone");
 
 		putToDictionary("minecraft:cracked_stone_bricks", "minecraft:cobblestone");
 		putToDictionary("minecraft:infested_cracked_stone_bricks", "minecraft:infested_cobblestone");
@@ -347,7 +365,7 @@ public class EventsHandler {
 		putToDictionary("minecraft:smooth_sandstone_slab", "minecraft:sandstone_slab");
 		putToDictionary("minecraft:sandstone", "minecraft:sand");
 		putToDictionary("minecraft:red_sandstone", "minecraft:red_sand");
-		putToDictionary("minecraft:smooth_sandstone", "minecraft:smooth_sand");
+		putToDictionary("minecraft:smooth_sandstone", "minecraft:sandstone");
 		putToDictionary("minecraft:sandstone_slab", "minecraft:sand_slab");
 		putToDictionary("minecraft:cut_sandstone_slab", "minecraft:cut_sand_slab");
 		putToDictionary("minecraft:sandstone_stairs", "minecraft:sand_stairs");
@@ -358,14 +376,14 @@ public class EventsHandler {
 		putToDictionary("minecraft:infested_stone_bricks", "minecraft:infested_cracked_stone_bricks");
 		putToDictionary("minecraft:nether_bricks", "minecraft:cracked_nether_bricks");
 		putToDictionary("minecraft:prismarine_bricks", "minecraft:cracked_prismarine_bricks");
-		putToDictionary("minecraft:end_stone_bricks", "minecraft:cracked_end_stone_bricks");
+		putToDictionary("minecraft:end_stone_bricks", "minecraft:end_stone");
 		putToDictionary("minecraft:red_nether_bricks", "minecraft:cracked_red_nether_bricks");
 		putToDictionary("minecraft:stone", "minecraft:cobblestone");
 		putToDictionary("minecraft:stone_slab", "minecraft:cobblestone_slab");
 		putToDictionary("minecraft:stone_brick_slab", "minecraft:cobblestone_brick_slab");
 		putToDictionary("minecraft:stone_pressure_plate", "minecraft:cobblestone_pressure_plate");
 		putToDictionary("minecraft:stone_button", "minecraft:cobblestone_button");
-		putToDictionary("minecraft:mossy_stone_bricks", "minecraft:mossy_cobblestone_bricks");
+		putToDictionary("minecraft:mossy_stone_bricks", "minecraft:mossy_cobblestone");
 		putToDictionary("minecraft:infested_mossy_stone_bricks", "minecraft:infested_mossy_cobblestone_bricks");
 		putToDictionary("minecraft:stone_brick_stairs", "minecraft:cobblestone_brick_stairs");
 		putToDictionary("minecraft:end_stone", "minecraft:end_cobblestone");
@@ -378,5 +396,6 @@ public class EventsHandler {
 		putToDictionary("minecraft:end_stone_brick_wall", "minecraft:end_cobblestone_brick_wall");
 		putToDictionary("minecraft:prismarine_bricks", "minecraft:prismarine");
 		putToDictionary("minecraft:prismarine_brick_stairs", "minecraft:prismarine_stairs");
+		putToDictionary("minecraft:cut_sandstone", "minecraft:sandstone");
 	}
 }
