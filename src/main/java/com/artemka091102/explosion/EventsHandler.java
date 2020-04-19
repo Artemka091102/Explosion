@@ -13,8 +13,11 @@ import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.item.TNTEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.ServerPlayerEntity;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.text.StringTextComponent;
 import net.minecraft.world.Explosion;
 import net.minecraft.world.World;
 import net.minecraftforge.event.world.ExplosionEvent;
@@ -41,16 +44,31 @@ public class EventsHandler {
 		
 		//ПОЛУЧЕНИЕ ИСТОЧНИКА ВЗРЫВА
         try {
+        	for (PlayerEntity serverPlayer : event.getWorld().getPlayers()) {
+        		serverPlayer.sendMessage(new StringTextComponent("TRY РАБОТАЕТ"));
+        	}
         	Field exploder = Explosion.class.getDeclaredField("exploder");
         	Field causesFire = Explosion.class.getDeclaredField("causesFire");
             exploder.setAccessible(true);
             causesFire.setAccessible(true);
+        	for (PlayerEntity serverPlayer : event.getWorld().getPlayers()) {
+        		serverPlayer.sendMessage(new StringTextComponent(exploder.getName()));
+        		serverPlayer.sendMessage(new StringTextComponent(causesFire.getName()));
+        		if (exploder.isAccessible()) serverPlayer.sendMessage(new StringTextComponent("exploder isAccessible"));
+        		if (causesFire.isAccessible()) serverPlayer.sendMessage(new StringTextComponent("causesFire isAccessible"));
+        	}
             //ЕСЛИ ЭТО ДИНАМИТ - ОГОНЬ БУДЕТ
             if (exploder.get(event.getExplosion()) instanceof TNTEntity) {
+            	for (PlayerEntity serverPlayer : event.getWorld().getPlayers()) {
+            		serverPlayer.sendMessage(new StringTextComponent("ЭТО ДИНАМИТ"));
+            	}
             	willFireBe = true;
             }
             //ЕСЛИ У ЭТОГО ЕСТЬ ОГОНЬ В ВАНИЛИ - ОГОНЬ БУДЕТ, НО НЕ ВАНИЛЬНЫЙ
             if (causesFire.getBoolean(event.getExplosion())) {
+            	for (PlayerEntity serverPlayer : event.getWorld().getPlayers()) {
+            		serverPlayer.sendMessage(new StringTextComponent("У ЭТОГО ЕСТЬ ОГОНЬ В ВАНИЛИ"));
+            	}
             	willFireBe = true;
             	causesFire.setBoolean(event.getExplosion(), false);
             }
@@ -397,5 +415,6 @@ public class EventsHandler {
 		putToDictionary("minecraft:prismarine_bricks", "minecraft:prismarine");
 		putToDictionary("minecraft:prismarine_brick_stairs", "minecraft:prismarine_stairs");
 		putToDictionary("minecraft:cut_sandstone", "minecraft:sandstone");
+		putToDictionary("minecraft:mossy_cobblestone", "minecraft:gravel");
 	}
 }
