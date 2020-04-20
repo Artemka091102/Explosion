@@ -1,24 +1,15 @@
 package com.artemka091102.explosion;
 
-import java.lang.reflect.Field;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
-import net.minecraft.entity.item.TNTEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.ServerPlayerEntity;
+import net.minecraft.entity.item.FallingBlockEntity;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.text.StringTextComponent;
-import net.minecraft.world.Explosion;
 import net.minecraft.world.World;
 import net.minecraftforge.event.world.ExplosionEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -28,92 +19,64 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 @EventBusSubscriber(modid = Main.MODID, bus=EventBusSubscriber.Bus.FORGE)
 public class EventsHandler {
-	
-	//СЛОВАРЬ СООТВЕТСТВИЙ БЛОКОВ
-	public static final Map<String, BlockState> crackedDictionary = new HashMap<String, BlockState>();
-	
-	//ЛОГГЕР
-	static final Logger LOGGER = LogManager.getLogger();
-	
-	//БУДЕТ ЛИ ОТ ВЗРЫВА ОГОНЬ?
-	static boolean willFireBe = false;
-	
-	//ОБРАБОТЧИК ВЗРЫВА
+
 	@SubscribeEvent
 	public static void explosion(ExplosionEvent event) {
 		
-		//ПОЛУЧЕНИЕ ИСТОЧНИКА ВЗРЫВА
-        try {
-        	for (PlayerEntity serverPlayer : event.getWorld().getPlayers()) {
-        		serverPlayer.sendMessage(new StringTextComponent("TRY РАБОТАЕТ"));
-        	}
-        	Field exploder = Explosion.class.getDeclaredField("exploder");
-        	Field causesFire = Explosion.class.getDeclaredField("causesFire");
-            exploder.setAccessible(true);
-            causesFire.setAccessible(true);
-        	for (PlayerEntity serverPlayer : event.getWorld().getPlayers()) {
-        		serverPlayer.sendMessage(new StringTextComponent(exploder.getName()));
-        		serverPlayer.sendMessage(new StringTextComponent(causesFire.getName()));
-        		if (exploder.isAccessible()) serverPlayer.sendMessage(new StringTextComponent("exploder isAccessible"));
-        		if (causesFire.isAccessible()) serverPlayer.sendMessage(new StringTextComponent("causesFire isAccessible"));
-        	}
-            //ЕСЛИ ЭТО ДИНАМИТ - ОГОНЬ БУДЕТ
-            if (exploder.get(event.getExplosion()) instanceof TNTEntity) {
-            	for (PlayerEntity serverPlayer : event.getWorld().getPlayers()) {
-            		serverPlayer.sendMessage(new StringTextComponent("ЭТО ДИНАМИТ"));
-            	}
-            	willFireBe = true;
-            }
-            //ЕСЛИ У ЭТОГО ЕСТЬ ОГОНЬ В ВАНИЛИ - ОГОНЬ БУДЕТ, НО НЕ ВАНИЛЬНЫЙ
-            if (causesFire.getBoolean(event.getExplosion())) {
-            	for (PlayerEntity serverPlayer : event.getWorld().getPlayers()) {
-            		serverPlayer.sendMessage(new StringTextComponent("У ЭТОГО ЕСТЬ ОГОНЬ В ВАНИЛИ"));
-            	}
-            	willFireBe = true;
-            	causesFire.setBoolean(event.getExplosion(), false);
-            }
-        } catch(Throwable e) {}
-		
-		//ОБРАБОТКА БЛОКОВ ПЕРЕД ВЗРЫВОМ
-	    World world = event.getWorld();
-	    List<BlockPos> blocksPos = event.getExplosion().getAffectedBlockPositions();
-	    HashSet<Triple> exploded = new HashSet<Triple>();
-	    for (BlockPos blockPos : blocksPos) {
-	        blockReplace(world, blockPos, exploded, false);
-	        blockReplace(world, blockPos.east(), exploded, true);
-	        blockReplace(world, blockPos.west(), exploded, true);
-	        blockReplace(world, blockPos.north(), exploded, true);
-	        blockReplace(world, blockPos.south(), exploded, true);
-	        blockReplace(world, blockPos.up(), exploded, true);
-	        blockReplace(world, blockPos.down(), exploded, true);
-	    }
-	    
-	    //НЕ ЗАБЫВАЕМ ОТКЛЮЧИТЬ ОГОНЬ ДЛЯ СЛЕДУЮЩЕГО ВЗРЫВА
-	    willFireBe = false;
+		//ЕСЛИ ВЗРЫВ НА СЕРВЕРЕ
+		World world = event.getWorld();
+		if (!world.isRemote) {
+			
+			//ОБРАБОТКА СПИСКА БЛОКОВ
+			List<BlockPos> blocksPos = event.getExplosion().getAffectedBlockPositions();
+			for (BlockPos blockPos : blocksPos) {
+				
+				//ЗАМЕНА ВЗОРВАННОГО БЛОКА НА ЕГО СЛОМАННУЮ ВЕРСИЮ
+				BlockState newBlockState = crackedDictionary.get(world.getBlockState(blockPos).getBlock().getRegistryName().toString());
+				if (newBlockState != null) world.setBlockState(blockPos, newBlockState);
+				
+				//ЗАМЕНЯЕМ БЛОКИ ВОКРУГ ВЗОРВАННОГО БЛОКА ЕСЛИ ОНИ НЕ ВЗОРВУТСЯ
+				changeBlock(world, blocksPos, blockPos.up());
+				changeBlock(world, blocksPos, blockPos.down());
+				changeBlock(world, blocksPos, blockPos.east());
+				changeBlock(world, blocksPos, blockPos.west());
+				changeBlock(world, blocksPos, blockPos.south());
+				changeBlock(world, blocksPos, blockPos.north());
+				
+				//ЕСЛИ БЛОК ВЫШЕ НЕ БУДЕТ ВЗОРВАН ТО ТРИ БЛОКА ВЫШЕ СТАНОВЯТСЯ ПАДАЮЩИМИ
+				if (!blocksPos.contains(blockPos.up())) {
+					checkFallable(world, blockPos.up());
+					checkFallable(world, blockPos.up(2));
+					checkFallable(world, blockPos.up(3));
+				}
+			}
+		}
+	}
+	
+	//ЗАМЕНА БЛОКА
+	public static void changeBlock(World world, List<BlockPos> blocksPos, BlockPos blockPos) {
+		if (!blocksPos.contains(blockPos) && world.rand.nextFloat() > 0.4) {
+			BlockState newBlockState = crackedDictionary.get(world.getBlockState(blockPos).getBlock().getRegistryName().toString());
+			if (newBlockState != null) world.setBlockState(blockPos, newBlockState);
+		}
+	}
+	
+	//БЛОК ПАДАЕТ ЕСЛИ МОЖЕТ
+	public static void checkFallable(World world, BlockPos blockPos) {
+		if (world.getBlockState(blockPos).getBlock() != Blocks.AIR) {
+			FallingBlockEntity fallingblockentity = new FallingBlockEntity(world, (double)blockPos.getX() + 0.5D, (double)blockPos.getY(), (double)blockPos.getZ() + 0.5D, world.getBlockState(blockPos));
+			world.addEntity(fallingblockentity);
+		}
 	}
 
-	//ЗАМЕНА БЛОКОВ
-	public static void blockReplace(World world, BlockPos blockPos, HashSet<Triple> exploded, boolean check) {
-		Triple tripleBlockPos = blockPosToTriple(blockPos);
-		if (check && exploded.contains(tripleBlockPos)) return;
-	    exploded.add(tripleBlockPos);
-	    if (world.getRandom().nextFloat() < 0.4F) return;
-	    BlockState blockState = crackedDictionary.get(world.getBlockState(blockPos).getBlock().getRegistryName().toString());
-	    if (blockState != null) {
-		    if (blockState == Blocks.FIRE.getDefaultState() && willFireBe) world.setBlockState(blockPos, blockState);
-		    else if (blockState != Blocks.FIRE.getDefaultState()) world.setBlockState(blockPos, blockState);
-	    }
-	}
-	
-	//ПРЕВРАЩЕНИЕ BLOCKPOS В TRIPLE
-	public static Triple blockPosToTriple(BlockPos blockPos) {
-		return new Triple(blockPos.getX(), blockPos.getY(), blockPos.getZ());
-	}
-	
+	//СЛОВАРЬ СООТВЕТСТВИЙ БЛОКОВ
+	public static final Map<String, BlockState> crackedDictionary = new HashMap<String, BlockState>();
+
 	//ДОБАВЛЕНИЕ СООТВЕТСТВИЙ БЛОКОВ В СЛОВАРЬ И ПРОВЕРКА НА СУЩЕСТВОВАНИЕ БЛОКА
 	public static void putToDictionary(String oldBlockRegName, String newBlockRegName) {
 		Block newBlock = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(newBlockRegName));
-		if (newBlock != Blocks.AIR) {
+		Block oldBlock = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(oldBlockRegName));
+		if (newBlock != Blocks.AIR && oldBlock != Blocks.AIR) {
 			crackedDictionary.put(oldBlockRegName, newBlock.getDefaultState());
 		}
 	}
@@ -121,8 +84,6 @@ public class EventsHandler {
 	//ДОБАВЛЕНИЕ СООТВЕТСТВИЙ БЛОКОВ В СЛОВАРЬ ПРИ ЗАГРУЗКЕ МАЙНКРАФТА
 	@SubscribeEvent
 	public static void onCommonSetup(FMLLoadCompleteEvent event) {
-		putToDictionary("minecraft:air", "minecraft:fire");
-		
 		putToDictionary("wildnature:basalt_slab", "wildnature:basalt_slab_cobble");
 		putToDictionary("wildnature:basalt_slab_bricks", "wildnature:basalt_slab_bricks_cracked");
 		putToDictionary("wildnature:basalt_slab_bricks_cracked", "wildnature:basalt_slab_cobble");
@@ -354,7 +315,6 @@ public class EventsHandler {
 		putToDictionary("wildnature:slate_roof_stairs", "wildnature:slate_stairs_cobble");
 		putToDictionary("wildnature:slate_trapdoor", "wildnature:slate_cobble_trapdoor");
 		putToDictionary("wildnature:slate_fence", "wildnature:slate_cobble_fence");
-		
 		putToDictionary("wildnature:overgrown_stone", "minecraft:mossy_cobblestone");
 
 		putToDictionary("minecraft:cracked_stone_bricks", "minecraft:cobblestone");
@@ -418,3 +378,94 @@ public class EventsHandler {
 		putToDictionary("minecraft:mossy_cobblestone", "minecraft:gravel");
 	}
 }
+
+/*
+		//ОБРАБОТКА ЕДИНИЧНОГО БЛОКА
+	public static void changeBlock(HashSet<BlockPos> changedPoses, List<BlockPos> blocksPos, World world, BlockPos blockPos) {
+		if (!blocksPos.contains(blockPos) && !changedPoses.contains(blockPos)) {
+			if (world.rand.nextFloat() > 0.3) {
+				BlockState newBlockState = crackedDictionary.get(world.getBlockState(blockPos).getBlock().getRegistryName().toString());
+				if (newBlockState != null) world.setBlockState(blockPos, newBlockState);
+			}
+			checkFallable(world, blockPos);
+			changedPoses.add(blockPos);
+		}
+	}
+	
+	//БЛОК ПАДАЕТ ЕСЛИ МОЖЕТ
+	public static void checkFallable(World worldIn, BlockPos pos) {
+		if (!worldIn.isRemote && pos.getY() > 0) {
+			FallingBlockEntity fallingblockentity = new FallingBlockEntity(worldIn, (double)pos.getX() + 0.5D, (double)pos.getY(), (double)pos.getZ() + 0.5D, worldIn.getBlockState(pos));
+			worldIn.addEntity(fallingblockentity);
+		}
+	}
+	
+	//МОЖЕТ ЛИ БЛОК ПАДАТЬ
+	public static boolean canFallThrough(BlockState state) {
+		Block block = state.getBlock();
+		Material material = state.getMaterial();
+		return state.getBlock() != Blocks.AIR || block == Blocks.FIRE || material.isLiquid() || material.isReplaceable();
+	}
+	
+
+	
+	//ОБРАБОТЧИК ВЗРЫВА
+	@SubscribeEvent
+	public static void explosion(ExplosionEvent event) {
+		
+		//ОБРАБОТКА БЛОКОВ ПЕРЕД ВЗРЫВОМ
+	    World world = event.getWorld();
+	    List<BlockPos> blocksPos = event.getExplosion().getAffectedBlockPositions();
+	    HashSet<Triple> exploded = new HashSet<Triple>();
+	    for (BlockPos blockPos : blocksPos) {
+	        blockReplace(world, blockPos, exploded, false);
+	        blockReplace(world, blockPos.east(), exploded, true);
+	        blockReplace(world, blockPos.west(), exploded, true);
+	        blockReplace(world, blockPos.north(), exploded, true);
+	        blockReplace(world, blockPos.south(), exploded, true);
+	        blockReplace(world, blockPos.up(), exploded, true);
+	        blockReplace(world, blockPos.down(), exploded, true);
+	    }
+	}
+	
+		//ЗАМЕНА БЛОКОВ
+	public static void blockReplace(World world, BlockPos blockPos, HashSet<Triple> exploded, boolean check) {
+			
+		//ОБРАБОТКА БЛОКОВ
+		Triple tripleBlockPos = blockPosToTriple(blockPos);
+		if (check && exploded.contains(tripleBlockPos)) return;
+	    exploded.add(tripleBlockPos);
+	    
+		//ФУНКЦИОНАЛ ОБВАЛА
+		checkFallable(world, blockPos);
+
+	    if (world.getRandom().nextFloat() < 0.4F) return;
+	    BlockState blockState = crackedDictionary.get(world.getBlockState(blockPos).getBlock().getRegistryName().toString());
+	    if (blockState != null) world.setBlockState(blockPos, blockState);
+	}
+	
+		
+	//ЛОГГЕР
+	static final Logger LOGGER = LogManager.getLogger();
+
+	//ПРЕВРАЩЕНИЕ BLOCKPOS В TRIPLE
+	public static Triple blockPosToTriple(BlockPos blockPos) {
+		return new Triple(blockPos.getX(), blockPos.getY(), blockPos.getZ());
+	}
+	
+	//БЛОК ПАДАЕТ ЕСЛИ МОЖЕТ
+	public static void checkFallable(World worldIn, BlockPos pos) {
+		if (!worldIn.isRemote && canFallThrough(worldIn.getBlockState(pos.down())) && pos.getY() > 0) {
+			FallingBlockEntity fallingblockentity = new FallingBlockEntity(worldIn, (double)pos.getX() + 0.5D, (double)pos.getY(), (double)pos.getZ() + 0.5D, worldIn.getBlockState(pos));
+			worldIn.addEntity(fallingblockentity);
+		}
+	}
+	
+	//МОЖЕТ ЛИ БЛОК ПАДАТЬ
+	public static boolean canFallThrough(BlockState state) {
+		Block block = state.getBlock();
+		Material material = state.getMaterial();
+		return state.getBlock() != Blocks.AIR || block == Blocks.FIRE || material.isLiquid() || material.isReplaceable();
+	}
+	
+*/
