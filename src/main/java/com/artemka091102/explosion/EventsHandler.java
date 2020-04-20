@@ -48,6 +48,7 @@ public class EventsHandler {
 					checkFallable(world, blockPos.up());
 					checkFallable(world, blockPos.up(2));
 					checkFallable(world, blockPos.up(3));
+					checkFallable(world, blockPos.up(4));
 				}
 			}
 		}
@@ -63,10 +64,15 @@ public class EventsHandler {
 	
 	//БЛОК ПАДАЕТ ЕСЛИ МОЖЕТ
 	public static void checkFallable(World world, BlockPos blockPos) {
-		if (world.getBlockState(blockPos).getBlock() != Blocks.AIR) {
+		if (!world.isRemote && canFallThrough(world.getBlockState(blockPos.down())) && blockPos.getY() > 0) {
 			FallingBlockEntity fallingblockentity = new FallingBlockEntity(world, (double)blockPos.getX() + 0.5D, (double)blockPos.getY(), (double)blockPos.getZ() + 0.5D, world.getBlockState(blockPos));
 			world.addEntity(fallingblockentity);
 		}
+	}
+	
+	//МОЖЕТ ЛИ БЛОК ПАДАТЬ
+	public static boolean canFallThrough(BlockState state) {
+		return state.getBlock() != Blocks.AIR || state.getBlock() == Blocks.FIRE || state.getMaterial().isLiquid() || state.getMaterial().isReplaceable();
 	}
 
 	//СЛОВАРЬ СООТВЕТСТВИЙ БЛОКОВ
