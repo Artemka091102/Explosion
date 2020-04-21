@@ -12,7 +12,9 @@ import net.minecraft.entity.item.FallingBlockEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.StringTextComponent;
+import net.minecraft.world.Explosion;
 import net.minecraft.world.World;
 import net.minecraftforge.event.world.ExplosionEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -31,18 +33,24 @@ public class EventsHandler {
 		if (!world.isRemote) {
 			
 			//ПЕРЕМЕННЫЕ
-			List<BlockPos> blocksPos = event.getExplosion().getAffectedBlockPositions();
+			Explosion explosion = event.getExplosion();
+			List<BlockPos> blocksPos = explosion.getAffectedBlockPositions();
 			HashMap<Pair, Pair> deep = new HashMap<Pair, Pair>();
+			Vec3d center = explosion.getPosition();
 			
 			//ОБРАБОТКА СПИСКА БЛОКОВ
 			for (BlockPos blockPos : blocksPos) {
+				if (world.getBlockState(blockPos).getBlock() == Blocks.AIR) continue;
 				
 				//ПОЛУЧЕНИЕ ВЫСОТЫ ОБВАЛА
 				Pair xz = new Pair(0, 0);
 				xz.a = blockPos.getX();
 				xz.b = blockPos.getZ();
-				if (deep.containsKey(xz) && deep.get(xz).a < blockPos.getY()) deep.get(xz).a = blockPos.getY();
-				else {
+				if (deep.containsKey(xz)) {
+					if (deep.get(xz).a < blockPos.getY()) {
+						deep.get(xz).a = blockPos.getY();
+					}
+				} else {
 					Pair yd = new Pair(0, 0);
 					yd.a = blockPos.getY();
 					yd.b = 0;
@@ -67,7 +75,7 @@ public class EventsHandler {
 			for (Entry<Pair, Pair> entry : deep.entrySet()) {
 				BlockPos top = new BlockPos(entry.getKey().a, entry.getValue().a, entry.getKey().b);
 				for (int i = 1; i < entry.getValue().b; i++) {
-					checkFallable(world, top.up(i));
+					checkFallable(world, top.up(i), center);
 				}
 		    }
 		}
@@ -82,9 +90,15 @@ public class EventsHandler {
 	}
 	
 	//БЛОК ПАДАЕТ ЕСЛИ МОЖЕТ
-	public static void checkFallable(World world, BlockPos blockPos) {
-		if (!world.isRemote && canFallThrough(world.getBlockState(blockPos.down())) && blockPos.getY() > 0) {
+	public static void checkFallable(World world, BlockPos blockPos, Vec3d center) {
+		if (!world.isRemote && blockPos.getY() > 0 && world.getBlockState(blockPos).getBlock() != Blocks.AIR) {
+			double k = 4;
+			double dx = blockPos.getX() - center.x;
+			double dy = blockPos.getY() - center.y;
+			double dz = blockPos.getZ() - center.z;
+			double distance = dx*dx+dy*dy+dz*dz;
 			FallingBlockEntity fallingblockentity = new FallingBlockEntity(world, (double)blockPos.getX() + 0.5D, (double)blockPos.getY(), (double)blockPos.getZ() + 0.5D, world.getBlockState(blockPos));
+			fallingblockentity.setVelocity(k*dx/distance, k*dy/distance, k*dz/distance);
 			world.addEntity(fallingblockentity);
 		}
 	}
@@ -108,7 +122,7 @@ public class EventsHandler {
 	public static final Map<String, BlockState> crackedDictionary = new HashMap<String, BlockState>();
 
 	//ДЕБАГ РЕЖИМ
-	private static final boolean debug = false;
+	private static final boolean debug = true;
 	
 	//ДОБАВЛЕНИЕ СООТВЕТСТВИЙ БЛОКОВ В СЛОВАРЬ И ПРОВЕРКА НА СУЩЕСТВОВАНИЕ БЛОКА
 	public static void putToDictionary(String oldBlockRegName, String newBlockRegName) {
@@ -355,6 +369,7 @@ public class EventsHandler {
 		putToDictionary("wildnature:slate_fence", "wildnature:slate_cobble_fence");
 		putToDictionary("wildnature:overgrown_stone", "minecraft:mossy_cobblestone");
 
+		putToDictionary("minecraft:grass_block", "minecraft:dirt");
 		putToDictionary("minecraft:cracked_stone_bricks", "minecraft:cobblestone");
 		putToDictionary("minecraft:infested_cracked_stone_bricks", "minecraft:infested_cobblestone");
 		putToDictionary("minecraft:cobblestone", "minecraft:gravel");
