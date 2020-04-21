@@ -35,28 +35,49 @@ public class EventsHandler {
 			//ПЕРЕМЕННЫЕ
 			Explosion explosion = event.getExplosion();
 			List<BlockPos> blocksPos = explosion.getAffectedBlockPositions();
-			HashMap<Pair, Pair> deep = new HashMap<Pair, Pair>();
 			Vec3d center = explosion.getPosition();
+			
+			HashMap<Pair, Triple> sizeX = new HashMap<Pair, Triple>(); //(Y, Z), (Xmin, Xmax, Xlen)
+			HashMap<Pair, Triple> sizeY = new HashMap<Pair, Triple>(); //(X, Z), (Ymin, Ymax, Ylen)
+			HashMap<Pair, Triple> sizeZ = new HashMap<Pair, Triple>(); //(X, Y), (Zmin, Zmax, Zlen)
 			
 			//ОБРАБОТКА СПИСКА БЛОКОВ
 			for (BlockPos blockPos : blocksPos) {
-				if (world.getBlockState(blockPos).getBlock() == Blocks.AIR) continue;
 				
-				//ПОЛУЧЕНИЕ ВЫСОТЫ ОБВАЛА
-				Pair xz = new Pair(0, 0);
-				xz.a = blockPos.getX();
-				xz.b = blockPos.getZ();
-				if (deep.containsKey(xz)) {
-					if (deep.get(xz).a < blockPos.getY()) {
-						deep.get(xz).a = blockPos.getY();
-					}
+				//ВОЗДУХ ОТСЕКАЕМ СРАЗУ
+				if (world.getBlockState(blockPos).getBlock() == Blocks.AIR) continue;
+				if (world.getBlockState(blockPos).getBlock() == Blocks.BEDROCK) continue;
+				
+				//НАХОЖДЕНИЕ ГЛУБИНЫ ВОРОНКИ В ПРОЕКЦИИ НА ПЛОСКОСТЬ
+				Pair coordsX = new Pair(blockPos.getY(), blockPos.getZ());
+				Pair coordsY = new Pair(blockPos.getX(), blockPos.getZ());
+				Pair coordsZ = new Pair(blockPos.getX(), blockPos.getY());
+
+				//НАХОЖДЕНИЕ ПАРАМЕТРОВ ВОРОНКИ
+				if (sizeX.containsKey(coordsX)) {
+					if (sizeX.get(coordsX).a > blockPos.getX()) sizeX.get(coordsX).a = blockPos.getX();
+					if (sizeX.get(coordsX).b < blockPos.getX()) sizeX.get(coordsX).a = blockPos.getX();
+					sizeX.get(coordsX).c += 1;
 				} else {
-					Pair yd = new Pair(0, 0);
-					yd.a = blockPos.getY();
-					yd.b = 0;
-					deep.put(xz, yd);
+					Triple x = new Triple(blockPos.getX(), blockPos.getX(), 1);
+					sizeX.put(coordsX, x);
 				}
-				deep.get(xz).b += 1;
+				if (sizeY.containsKey(coordsY)) {
+					if (sizeY.get(coordsY).a > blockPos.getY()) sizeY.get(coordsY).a = blockPos.getY();
+					if (sizeY.get(coordsY).b < blockPos.getY()) sizeY.get(coordsY).a = blockPos.getY();
+					sizeY.get(coordsY).c += 1;
+				} else {
+					Triple y = new Triple(blockPos.getY(), blockPos.getY(), 1);
+					sizeY.put(coordsY, y);
+				}
+				if (sizeZ.containsKey(coordsZ)) {
+					if (sizeZ.get(coordsZ).a > blockPos.getZ()) sizeZ.get(coordsZ).a = blockPos.getZ();
+					if (sizeZ.get(coordsZ).b < blockPos.getZ()) sizeZ.get(coordsZ).a = blockPos.getZ();
+					sizeZ.get(coordsZ).c += 1;
+				} else {
+					Triple z = new Triple(blockPos.getZ(), blockPos.getZ(), 1);
+					sizeZ.put(coordsZ, z);
+				}
 				
 				//ЗАМЕНА ВЗОРВАННОГО БЛОКА НА ЕГО СЛОМАННУЮ ВЕРСИЮ
 				BlockState newBlockState = crackedDictionary.get(world.getBlockState(blockPos).getBlock().getRegistryName().toString());
@@ -70,12 +91,79 @@ public class EventsHandler {
 				changeBlock(world, blocksPos, blockPos.south());
 				changeBlock(world, blocksPos, blockPos.north());
 			}
-
+			
 			//ОБВАЛИВАЕМ ВСЕ БЛОКИ ВЫШЕ
-			for (Entry<Pair, Pair> entry : deep.entrySet()) {
-				BlockPos top = new BlockPos(entry.getKey().a, entry.getValue().a, entry.getKey().b);
-				for (int i = 1; i < entry.getValue().b; i++) {
-					checkFallable(world, top.up(i), center);
+			
+			double k = 4;
+			double dx;
+			double dy;
+			double dz;
+			double distance;
+
+			//(Y, Z), (Xmin, Xmax, Xlen)
+			for (Entry<Pair, Triple> entry : sizeX.entrySet()) {
+				for (int i = 1; i <= entry.getValue().c; i++) {
+					BlockPos min = new BlockPos(entry.getValue().a-i+0.5D, entry.getKey().a, entry.getKey().b+0.5D);
+					BlockPos max = new BlockPos(entry.getValue().b+i+0.5D, entry.getKey().a, entry.getKey().b+0.5D);
+					FallingBlockEntity minFBE = new FallingBlockEntity(world, min.getX(), min.getY(), min.getZ(), world.getBlockState(min));
+					FallingBlockEntity maxFBE = new FallingBlockEntity(world, max.getX(), max.getY(), max.getZ(), world.getBlockState(max));
+					if (world.getBlockState(min).getBlock() == Blocks.AIR || world.getBlockState(min).getBlock() == Blocks.BEDROCK || world.getBlockState(max).getBlock() == Blocks.AIR || world.getBlockState(max).getBlock() == Blocks.BEDROCK) continue;
+					dx = min.getX() - center.x;
+					dy = min.getY() - center.y;
+					dz = min.getZ() - center.z;
+					distance = dx*dx+dy*dy+dz*dz;
+					minFBE.setVelocity(k*dx/distance, k*dy/distance, k*dz/distance);
+					world.addEntity(minFBE);
+					dx = max.getX() - center.x;
+					dy = max.getY() - center.y;
+					dz = max.getZ() - center.z;
+					distance = dx*dx+dy*dy+dz*dz;
+					maxFBE.setVelocity(k*dx/distance, k*dy/distance, k*dz/distance);
+					world.addEntity(maxFBE);
+				}
+		    }
+			//(X, Z), (Ymin, Ymax, Ylen)
+			for (Entry<Pair, Triple> entry : sizeY.entrySet()) {
+				for (int i = 1; i <= entry.getValue().c; i++) {
+					BlockPos min = new BlockPos(entry.getKey().a+0.5D, entry.getValue().a-i, entry.getKey().b+0.5D);
+					BlockPos max = new BlockPos(entry.getKey().a+0.5D, entry.getValue().b+i, entry.getKey().b+0.5D);
+					FallingBlockEntity minFBE = new FallingBlockEntity(world, min.getX(), min.getY(), min.getZ(), world.getBlockState(min));
+					FallingBlockEntity maxFBE = new FallingBlockEntity(world, max.getX(), max.getY(), max.getZ(), world.getBlockState(max));
+					if (world.getBlockState(min).getBlock() == Blocks.AIR || world.getBlockState(min).getBlock() == Blocks.BEDROCK || world.getBlockState(max).getBlock() == Blocks.AIR || world.getBlockState(max).getBlock() == Blocks.BEDROCK) continue;
+					dx = min.getX() - center.x;
+					dy = min.getY() - center.y;
+					dz = min.getZ() - center.z;
+					distance = dx*dx+dy*dy+dz*dz;
+					minFBE.setVelocity(k*dx/distance, k*dy/distance, k*dz/distance);
+					world.addEntity(minFBE);
+					dx = max.getX() - center.x;
+					dy = max.getY() - center.y;
+					dz = max.getZ() - center.z;
+					distance = dx*dx+dy*dy+dz*dz;
+					maxFBE.setVelocity(k*dx/distance, k*dy/distance, k*dz/distance);
+					world.addEntity(maxFBE);
+				}
+		    }
+			//(X, Y), (Zmin, Zmax, Zlen)
+			for (Entry<Pair, Triple> entry : sizeZ.entrySet()) {
+				for (int i = 1; i <= entry.getValue().c; i++) {
+					BlockPos min = new BlockPos(entry.getKey().a+0.5D, entry.getKey().b, entry.getValue().a-i+0.5D);
+					BlockPos max = new BlockPos(entry.getKey().a+0.5D, entry.getKey().b, entry.getValue().b+i+0.5D);
+					FallingBlockEntity minFBE = new FallingBlockEntity(world, min.getX(), min.getY(), min.getZ(), world.getBlockState(min));
+					FallingBlockEntity maxFBE = new FallingBlockEntity(world, max.getX(), max.getY(), max.getZ(), world.getBlockState(max));
+					if (world.getBlockState(min).getBlock() == Blocks.AIR || world.getBlockState(min).getBlock() == Blocks.BEDROCK || world.getBlockState(max).getBlock() == Blocks.AIR || world.getBlockState(max).getBlock() == Blocks.BEDROCK) continue;
+					dx = min.getX() - center.x;
+					dy = min.getY() - center.y;
+					dz = min.getZ() - center.z;
+					distance = dx*dx+dy*dy+dz*dz;
+					minFBE.setVelocity(k*dx/distance, k*dy/distance, k*dz/distance);
+					world.addEntity(minFBE);
+					dx = max.getX() - center.x;
+					dy = max.getY() - center.y;
+					dz = max.getZ() - center.z;
+					distance = dx*dx+dy*dy+dz*dz;
+					maxFBE.setVelocity(k*dx/distance, k*dy/distance, k*dz/distance);
+					world.addEntity(maxFBE);
 				}
 		    }
 		}
@@ -431,3 +519,21 @@ public class EventsHandler {
 		putToDictionary("minecraft:mossy_cobblestone", "minecraft:gravel");
 	}
 }
+
+/*
+//ПОЛУЧЕНИЕ ВЫСОТЫ ОБВАЛА
+Pair xz = new Pair(0, 0);
+xz.a = blockPos.getX();
+xz.b = blockPos.getZ();
+if (deep.containsKey(xz)) {
+	if (deep.get(xz).a < blockPos.getY()) {
+		deep.get(xz).a = blockPos.getY();
+	}
+} else {
+	Pair yd = new Pair(0, 0);
+	yd.a = blockPos.getY();
+	yd.b = 0;
+	deep.put(xz, yd);
+}
+deep.get(xz).b += 1;
+*/
