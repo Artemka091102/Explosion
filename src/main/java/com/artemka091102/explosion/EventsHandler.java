@@ -3,13 +3,16 @@ package com.artemka091102.explosion;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.item.FallingBlockEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.text.StringTextComponent;
 import net.minecraft.world.World;
 import net.minecraftforge.event.world.ExplosionEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -22,14 +25,30 @@ public class EventsHandler {
 
 	@SubscribeEvent
 	public static void explosion(ExplosionEvent event) {
-		
+
 		//ЕСЛИ ВЗРЫВ НА СЕРВЕРЕ
 		World world = event.getWorld();
 		if (!world.isRemote) {
 			
-			//ОБРАБОТКА СПИСКА БЛОКОВ
+			//ПЕРЕМЕННЫЕ
 			List<BlockPos> blocksPos = event.getExplosion().getAffectedBlockPositions();
+			HashMap<Pair, Pair> deep = new HashMap<Pair, Pair>();
+			
+			//ОБРАБОТКА СПИСКА БЛОКОВ
 			for (BlockPos blockPos : blocksPos) {
+				
+				//ПОЛУЧЕНИЕ ВЫСОТЫ ОБВАЛА
+				Pair xz = new Pair(0, 0);
+				xz.a = blockPos.getX();
+				xz.b = blockPos.getZ();
+				if (deep.containsKey(xz) && deep.get(xz).a < blockPos.getY()) deep.get(xz).a = blockPos.getY();
+				else {
+					Pair yd = new Pair(0, 0);
+					yd.a = blockPos.getY();
+					yd.b = 0;
+					deep.put(xz, yd);
+				}
+				deep.get(xz).b += 1;
 				
 				//ЗАМЕНА ВЗОРВАННОГО БЛОКА НА ЕГО СЛОМАННУЮ ВЕРСИЮ
 				BlockState newBlockState = crackedDictionary.get(world.getBlockState(blockPos).getBlock().getRegistryName().toString());
@@ -42,15 +61,15 @@ public class EventsHandler {
 				changeBlock(world, blocksPos, blockPos.west());
 				changeBlock(world, blocksPos, blockPos.south());
 				changeBlock(world, blocksPos, blockPos.north());
-				
-				//ЕСЛИ БЛОК ВЫШЕ НЕ БУДЕТ ВЗОРВАН ТО ТРИ БЛОКА ВЫШЕ СТАНОВЯТСЯ ПАДАЮЩИМИ
-				if (!blocksPos.contains(blockPos.up())) {
-					checkFallable(world, blockPos.up());
-					checkFallable(world, blockPos.up(2));
-					checkFallable(world, blockPos.up(3));
-					checkFallable(world, blockPos.up(4));
-				}
 			}
+
+			//ОБВАЛИВАЕМ ВСЕ БЛОКИ ВЫШЕ
+			for (Entry<Pair, Pair> entry : deep.entrySet()) {
+				BlockPos top = new BlockPos(entry.getKey().a, entry.getValue().a, entry.getKey().b);
+				for (int i = 1; i < entry.getValue().b; i++) {
+					checkFallable(world, top.up(i));
+				}
+		    }
 		}
 	}
 	
@@ -75,9 +94,22 @@ public class EventsHandler {
 		return state.getBlock() != Blocks.AIR || state.getBlock() == Blocks.FIRE || state.getMaterial().isLiquid() || state.getMaterial().isReplaceable();
 	}
 
+	//ПИШЕМ В ЧАТ
+	public static void writeToChat(World world, Object object) {
+		if (!debug) return ;
+		List<? extends PlayerEntity> players = world.getWorld().getPlayers();
+		for (PlayerEntity player : players) {
+			player.sendMessage(new StringTextComponent(object.toString()));
+
+		}
+	}
+	
 	//СЛОВАРЬ СООТВЕТСТВИЙ БЛОКОВ
 	public static final Map<String, BlockState> crackedDictionary = new HashMap<String, BlockState>();
 
+	//ДЕБАГ РЕЖИМ
+	private static final boolean debug = false;
+	
 	//ДОБАВЛЕНИЕ СООТВЕТСТВИЙ БЛОКОВ В СЛОВАРЬ И ПРОВЕРКА НА СУЩЕСТВОВАНИЕ БЛОКА
 	public static void putToDictionary(String oldBlockRegName, String newBlockRegName) {
 		Block newBlock = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(newBlockRegName));
@@ -384,94 +416,3 @@ public class EventsHandler {
 		putToDictionary("minecraft:mossy_cobblestone", "minecraft:gravel");
 	}
 }
-
-/*
-		//ОБРАБОТКА ЕДИНИЧНОГО БЛОКА
-	public static void changeBlock(HashSet<BlockPos> changedPoses, List<BlockPos> blocksPos, World world, BlockPos blockPos) {
-		if (!blocksPos.contains(blockPos) && !changedPoses.contains(blockPos)) {
-			if (world.rand.nextFloat() > 0.3) {
-				BlockState newBlockState = crackedDictionary.get(world.getBlockState(blockPos).getBlock().getRegistryName().toString());
-				if (newBlockState != null) world.setBlockState(blockPos, newBlockState);
-			}
-			checkFallable(world, blockPos);
-			changedPoses.add(blockPos);
-		}
-	}
-	
-	//БЛОК ПАДАЕТ ЕСЛИ МОЖЕТ
-	public static void checkFallable(World worldIn, BlockPos pos) {
-		if (!worldIn.isRemote && pos.getY() > 0) {
-			FallingBlockEntity fallingblockentity = new FallingBlockEntity(worldIn, (double)pos.getX() + 0.5D, (double)pos.getY(), (double)pos.getZ() + 0.5D, worldIn.getBlockState(pos));
-			worldIn.addEntity(fallingblockentity);
-		}
-	}
-	
-	//МОЖЕТ ЛИ БЛОК ПАДАТЬ
-	public static boolean canFallThrough(BlockState state) {
-		Block block = state.getBlock();
-		Material material = state.getMaterial();
-		return state.getBlock() != Blocks.AIR || block == Blocks.FIRE || material.isLiquid() || material.isReplaceable();
-	}
-	
-
-	
-	//ОБРАБОТЧИК ВЗРЫВА
-	@SubscribeEvent
-	public static void explosion(ExplosionEvent event) {
-		
-		//ОБРАБОТКА БЛОКОВ ПЕРЕД ВЗРЫВОМ
-	    World world = event.getWorld();
-	    List<BlockPos> blocksPos = event.getExplosion().getAffectedBlockPositions();
-	    HashSet<Triple> exploded = new HashSet<Triple>();
-	    for (BlockPos blockPos : blocksPos) {
-	        blockReplace(world, blockPos, exploded, false);
-	        blockReplace(world, blockPos.east(), exploded, true);
-	        blockReplace(world, blockPos.west(), exploded, true);
-	        blockReplace(world, blockPos.north(), exploded, true);
-	        blockReplace(world, blockPos.south(), exploded, true);
-	        blockReplace(world, blockPos.up(), exploded, true);
-	        blockReplace(world, blockPos.down(), exploded, true);
-	    }
-	}
-	
-		//ЗАМЕНА БЛОКОВ
-	public static void blockReplace(World world, BlockPos blockPos, HashSet<Triple> exploded, boolean check) {
-			
-		//ОБРАБОТКА БЛОКОВ
-		Triple tripleBlockPos = blockPosToTriple(blockPos);
-		if (check && exploded.contains(tripleBlockPos)) return;
-	    exploded.add(tripleBlockPos);
-	    
-		//ФУНКЦИОНАЛ ОБВАЛА
-		checkFallable(world, blockPos);
-
-	    if (world.getRandom().nextFloat() < 0.4F) return;
-	    BlockState blockState = crackedDictionary.get(world.getBlockState(blockPos).getBlock().getRegistryName().toString());
-	    if (blockState != null) world.setBlockState(blockPos, blockState);
-	}
-	
-		
-	//ЛОГГЕР
-	static final Logger LOGGER = LogManager.getLogger();
-
-	//ПРЕВРАЩЕНИЕ BLOCKPOS В TRIPLE
-	public static Triple blockPosToTriple(BlockPos blockPos) {
-		return new Triple(blockPos.getX(), blockPos.getY(), blockPos.getZ());
-	}
-	
-	//БЛОК ПАДАЕТ ЕСЛИ МОЖЕТ
-	public static void checkFallable(World worldIn, BlockPos pos) {
-		if (!worldIn.isRemote && canFallThrough(worldIn.getBlockState(pos.down())) && pos.getY() > 0) {
-			FallingBlockEntity fallingblockentity = new FallingBlockEntity(worldIn, (double)pos.getX() + 0.5D, (double)pos.getY(), (double)pos.getZ() + 0.5D, worldIn.getBlockState(pos));
-			worldIn.addEntity(fallingblockentity);
-		}
-	}
-	
-	//МОЖЕТ ЛИ БЛОК ПАДАТЬ
-	public static boolean canFallThrough(BlockState state) {
-		Block block = state.getBlock();
-		Material material = state.getMaterial();
-		return state.getBlock() != Blocks.AIR || block == Blocks.FIRE || material.isLiquid() || material.isReplaceable();
-	}
-	
-*/
