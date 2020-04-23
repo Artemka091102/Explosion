@@ -27,15 +27,16 @@ public class EventsHandler {
 	
 	//СЛОВАРЬ ПАР БЛОКОВ
 	private static final HashMap<String, BlockState> crackedDictionary = new HashMap<String, BlockState>();
-	
-	//СПИСОК ИЗМЕНЕННЫХ БЛОКОВ
-	private static final HashSet<BlockPos> degradatedBlocks = new HashSet<BlockPos>();
-	
+
+	//СПИСОК ДЕГРАДИРОВАННЫХ БЛОКОВ
+	private static HashSet<BlockPos> degradedBlocksPos;
+
 	//ПЕРЕМЕННЫЕ ИЗ КОНФИГА
-	private static boolean changeBlocksInCrater = ExplosionSettings.changeBlocksInCrater.get();
-	private static boolean changeBlocksNearCrater = ExplosionSettings.changeBlocksNearCrater.get();
 	private static boolean fallBlocksNearCrater = ExplosionSettings.fallBlocksNearCrater.get();
 	private static boolean flyBlocksNearCrater = ExplosionSettings.flyBlocksNearCrater.get();
+
+	//МУСОРНЫЕ ПЕРЕМЕННЫЕ
+	private static BlockPos GarbageBlockPos = new BlockPos(0, -1, 0);
 
 	//ОБРАБОТКА ВЗРЫВА
 	@SubscribeEvent
@@ -44,73 +45,92 @@ public class EventsHandler {
 		//МИР В КОТОРОМ ВЗРЫВ
 		World world = event.getWorld();
 
-		//ВЫХОДИМ ЕСЛИ МЫ НА КЛИЕНТЕ
-		if (world.isRemote) {
-			return;
-		}
+		//ЕСЛИ МЫ НА КЛИЕНТЕ ВЫХОДИМ 
+		if (world.isRemote) return;
 		
 		//НЕОБХОДИМЫЕ ПЕРЕМЕННЫЕ
 		Explosion explosion = event.getExplosion();
 		List<BlockPos> blocksPos = explosion.getAffectedBlockPositions();
 		Vec3d center = explosion.getPosition();
+		degradedBlocksPos = new HashSet<BlockPos>();
 		
 		//ПЕРЕБИРАЕМ ВСЕ БЛОКИ ИЗ ВОРОНКИ
 		for (BlockPos blockPos : blocksPos) {
+
+			//МЕНЯЕМ БЛОК ВНУТРИ ВОРОНКИ
+			degradeBlock(world, blockPos, degradedBlocksPos, 1F);
 			
-			//ЕСЛИ НИЧЕГО С БЛОКОМ ДЕЛАТЬ НЕЛЬЗЯ ВЫХОДИМ
-			if(!canBlockBeExploded(world.getBlockState(blockPos).getBlock())) {
-				continue;
-			}
-			
-			//ЗАМЕНЯЕМ ВЗОРВАННЫЙ БЛОК ЕСЛИ НУЖНО
-			if (changeBlocksInCrater) {
-				degradateBlock(world, blockPos, 1);
-			}
-			
-			//ЗАМЕНЯЕМ БЛОКИ ВОКРУГ ВОРОНКИ ЕСЛИ НУЖНО
-			if (changeBlocksNearCrater) {
-				processingBlocksNearCrater(world, blockPos, blocksPos, center, true, false, false);
-			}
-			
-			//ОБВАЛИВАЕМ БЛОКИ ВОКРУГ ВОРОНКИ ЕСЛИ НУЖНО
-			if (fallBlocksNearCrater) {
-				processingBlocksNearCrater(world, blockPos, blocksPos, center, false, true, false);
-			}
-			
-			//РАЗЛЕТАЕМ БЛОКИ  ВОКРУГ ВОРОНКИ ЕСЛИ НУЖНО
-			if (flyBlocksNearCrater) {
-				processingBlocksNearCrater(world, blockPos, blocksPos, center, false, false, true);
+			//РАБОТАЕМ С БЛОКАМИ ВОКРУГ ВОРОНКИ ЕСЛИ ХОТЬ ЧТО-ТО НАДО
+			if (fallBlocksNearCrater || flyBlocksNearCrater) {
+				prepareBlocksNearBlock(world, blockPos, blocksPos, center);
 			}
 		}
 	}
 	
+	private static void prepareBlocksNearBlock(World world, BlockPos blockPos, List<BlockPos> blocksPos, Vec3d center) {
+		for (int i = 0; i < 6; i++) {
+			GarbageBlockPos = getNearBlock(blockPos, i);
+			if (!blocksPos.contains(GarbageBlockPos)) {
+
+				//РОНЯЕМ БЛОКИ ВОКРУГ ВОРОНКИ
+				if (fallBlocksNearCrater && !flyBlocksNearCrater) {
+					degradeBlock(world, GarbageBlockPos, degradedBlocksPos, 0.3F);
+					if (canFlyThrough(world.getBlockState(getNearBlock(GarbageBlockPos, 4)))) {
+						fallBlock(world, GarbageBlockPos, Vec3d.ZERO);
+					}
+				}
+			
+				//ОТПРАВЛЯЕМ ЭТИ БЛОКИ ЛЕТЕТЬ
+				if (fallBlocksNearCrater && flyBlocksNearCrater) {
+					if (canFlyThrough(world.getBlockState(getNearBlock(GarbageBlockPos, i)))) {
+						degradeBlock(world, GarbageBlockPos, degradedBlocksPos, 1F);
+						fallBlock(world, GarbageBlockPos, calculateVelocity(GarbageBlockPos, center, 4));
+					} else {
+						degradeBlock(world, GarbageBlockPos, degradedBlocksPos, 0.3F);
+					}
+				}
+			}
+		}
+	}
+
+	//ПОЛУЧЕНИЕ МАССИВА БЛОКОВ РЯДОМ С ДАННЫМ
+	private static BlockPos getNearBlock(BlockPos blockPos, int i) {
+		if (i == 0) return blockPos.east();
+		if (i == 1) return blockPos.up();
+		if (i == 2) return blockPos.south();
+		if (i == 3) return blockPos.west();
+		if (i == 4) return blockPos.down();
+		if (i == 5) return blockPos.north();
+		return new BlockPos(0, 0, 0);
+	}
+	
 	//ДЕГРАДАЦИЯ БЛОКА ПО КООРДИНАТАМ
-	private static void degradateBlock(World world, BlockPos blockPos, float chance) {
+	private static void degradeBlock(World world, BlockPos blockPos, HashSet<BlockPos> degradedBlocksPos, float chance) {
 		
 		//ПРОВЕРЯЕМ РАНДОМ И ЕСТЬ ЛИ БЛОК В ОБРАБОТАННЫХ
-		if (world.getRandom().nextFloat() < chance || degradatedBlocks.contains(blockPos)) {
-			return;
-		}
+		if (world.getRandom().nextFloat() > chance || degradedBlocksPos.contains(blockPos)) return;
 		
 		//ЗАМЕНЯЕМ БЛОК ЕСЛИ МАПА ВЕРНУЛА НЕ НОЛЬ И ЕСЛИ ПОВЕЗЛО
 		BlockState newBlockState = crackedDictionary.get(world.getBlockState(blockPos).getBlock().getRegistryName().toString());
 		if (newBlockState != null) {
 			world.setBlockState(blockPos, newBlockState);
-			degradatedBlocks.add(blockPos);
+			degradedBlocksPos.add(blockPos);
 		}
 	}
-	
+
 	//ПАДЕНИЕ БЛОКА
 	private static void fallBlock(World world, BlockPos blockPos, Vec3d velocity) {
-		if(!canBlockBeExploded(world.getBlockState(blockPos).getBlock())) {
-			return;
-		}
 		
+		//ЕСЛИ БЛОК НЕ МОЖЕТ БЫТЬ ОБРАБОТАН МОДОМ
+		if(!canBlockBeExploded(world.getBlockState(blockPos).getBlock())) return;
+		
+		//СОЗДАНИЕ ЭНТИТИ И ВЫДАЧА СКОРОСТИ
 		FallingBlockEntity FBE = new FallingBlockEntity(world, blockPos.getX(), blockPos.getY(), blockPos.getZ(), world.getBlockState(blockPos));
 		FBE.setVelocity(velocity.x, velocity.y, velocity.z);
 		world.addEntity(FBE);
 	}
-	
+
+	//РАСЧЕТ СКОРОСТИ
 	private static Vec3d calculateVelocity(BlockPos blockPos, Vec3d center, double k) {
 		double dx = blockPos.getX() - center.x;
 		double dy = blockPos.getY() - center.y;
@@ -119,93 +139,15 @@ public class EventsHandler {
 		return new Vec3d(k*dx/distance, k*dy/distance, k*dz/distance);
 	}
 	
-	//ОБРАБОТКА БЛОКОВ ВОКРУГ ВОРОНКИ
-	private static void processingBlocksNearCrater(World world, BlockPos blockPos, List<BlockPos> blocksPos, Vec3d center, boolean change, boolean fall, boolean fly) {
-		
-		//ЕСЛИ НИЧЕГО НЕ НУЖНО ВЫХОДИМ
-		if (!change && !fall && !fly) {
-			return;
-		}
-		
-		//ЕСЛИ БЛОК СВЕРХУ НЕ ВЗОРВЕТСЯ
-		if (!blocksPos.contains(blockPos.up())) {
-			if (change) {
-				degradateBlock(world, blockPos.up(), 0.3F);
-			}
-			if (fall) {
-				fallBlock(world, blockPos.up(), Vec3d.ZERO);
-			}
-			if (fly) {
-				fallBlock(world, blockPos.up(), calculateVelocity(blockPos, center, 4));
-			}
-		}
-		
-		//ЕСЛИ БЛОК СНИЗУ НЕ ВЗОРВЕТСЯ
-		if (!blocksPos.contains(blockPos.down())) {
-			if (change) {
-				degradateBlock(world, blockPos.down(), 0.3F);
-			}
-			if (fall) {
-				fallBlock(world, blockPos.down(), Vec3d.ZERO);
-			}
-			if (fly) {
-				fallBlock(world, blockPos.down(), calculateVelocity(blockPos, center, 4));
-			}
-		}
-		
-		//ЕСЛИ БЛОК ЮЖНЕЕ НЕ ВЗОРВЕТСЯ
-		if (!blocksPos.contains(blockPos.south())) {
-			if (change) {
-				degradateBlock(world, blockPos.south(), 0.3F);
-			}
-			if (fall) {
-				fallBlock(world, blockPos.south(), Vec3d.ZERO);
-			}
-			if (fly) {
-				fallBlock(world, blockPos.south(), calculateVelocity(blockPos, center, 4));
-			}
-		}
-		
-		//ЕСЛИ БЛОК СЕВЕРНЕЕ НЕ ВЗОРВЕТСЯ
-		if (!blocksPos.contains(blockPos.north())) {
-			if (change) {
-				degradateBlock(world, blockPos.north(), 0.3F);
-			}
-			if (fall) {
-				fallBlock(world, blockPos.north(), Vec3d.ZERO);
-			}
-			if (fly) {
-				fallBlock(world, blockPos.north(), calculateVelocity(blockPos, center, 4));
-			}
-		}
-		
-		//ЕСЛИ БЛОК ЗАПАДНЕЕ НЕ ВЗОРВЕТСЯ
-		if (!blocksPos.contains(blockPos.west())) {
-			if (change) {
-				degradateBlock(world, blockPos.west(), 0.3F);
-			}
-			if (fall) {
-				fallBlock(world, blockPos.west(), Vec3d.ZERO);
-			}
-			if (fly) {
-				fallBlock(world, blockPos.west(), calculateVelocity(blockPos, center, 4));
-			}
-		}
-		
-		//ЕСЛИ БЛОК ВОСТОЧНЕЕ НЕ ВЗОРВЕТСЯ
-		if (!blocksPos.contains(blockPos.east())) {
-			if (change) {
-				degradateBlock(world, blockPos.east(), 0.3F);
-			}
-			if (fall) {
-				fallBlock(world, blockPos.east(), Vec3d.ZERO);
-			}
-			if (fly) {
-				fallBlock(world, blockPos.east(), calculateVelocity(blockPos, center, 4));
-			}
-		}
+	//МОЖНО ЛИ ПРОЛЕТЕТЬ СКВОЗЬ БЛОК
+	public static boolean canFlyThrough(BlockState blockState) {
+		return blockState.getBlock() == Blocks.AIR
+				|| blockState.getBlock() == Blocks.FIRE
+				|| blockState.getMaterial().isLiquid()
+				|| blockState.getMaterial().isReplaceable();
 	}
-	
+
+	//МОЖЕТ ЛИ БЛОК БЫТЬ ОБРАБОТАН МОДОМ
 	private static boolean canBlockBeExploded(Block block) {
 		return block != Blocks.AIR
 				&& block != Blocks.BEDROCK
@@ -216,7 +158,7 @@ public class EventsHandler {
 				&& block != Blocks.STRUCTURE_VOID
 				&& block != Blocks.BARRIER;
 	}
-	
+
 	//ДОБАВЛЕНИЕ ПАР БЛОКОВ В СЛОВАРЬ
 	private static void putToDictionary(String oldBlockRegName, String newBlockRegName) {
 		Block newBlock = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(newBlockRegName));
@@ -229,7 +171,7 @@ public class EventsHandler {
 	//ОБРАБОТКА ЗАПУСКА МАЙНКРАФТА
 	@SubscribeEvent
 	public static void onCommonSetup(FMLLoadCompleteEvent event) {
-		
+
 		//ЗАПОЛНЯЕМ СЛОВАРЬ ПАР БЛОКОВ С ПРОВЕРКОЙ
 		putToDictionary("wildnature:basalt_slab", "wildnature:basalt_slab_cobble");
 		putToDictionary("wildnature:basalt_slab_bricks", "wildnature:basalt_slab_bricks_cracked");
@@ -526,162 +468,3 @@ public class EventsHandler {
 		putToDictionary("minecraft:mossy_cobblestone", "minecraft:gravel");
 	}
 }
-
-
-/*
-	@SubscribeEvent
-	public static void explosion(ExplosionEvent event) {		
-		//ЕСЛИ ВЗРЫВ НА СЕРВЕРЕ
-		World world = event.getWorld();
-		if (!world.isRemote && ExplosionSettings.changeBlocksInCrater.get()) {
-			
-			//ПЕРЕМЕННЫЕ
-			Explosion explosion = event.getExplosion();
-			List<BlockPos> blocksPos = explosion.getAffectedBlockPositions();
-			Vec3d center = explosion.getPosition();
-			
-			//МАПЫ ДЛЯ ПАРАМЕТРОВ ВОРОНКИ
-			HashMap<Pair, Triple> sizeX = new HashMap<Pair, Triple>(); //(Y, Z), (Xmin, Xmax, Xlen)
-			HashMap<Pair, Triple> sizeY = new HashMap<Pair, Triple>(); //(X, Z), (Ymin, Ymax, Ylen)
-			HashMap<Pair, Triple> sizeZ = new HashMap<Pair, Triple>(); //(X, Y), (Zmin, Zmax, Zlen)
-			
-			//ОБРАБОТКА СПИСКА БЛОКОВ
-			for (BlockPos blockPos : blocksPos) {
-				
-				//ЕСЛИ БЛОК НЕЛЬЗЯ ВЗОРВАТЬ ОТСЕКАЕМ СРАЗУ
-				if (!canBlockBeExploded(world, blockPos)) continue;
-				
-				//НАХОЖДЕНИЕ ГЛУБИНЫ ВОРОНКИ В ПРОЕКЦИИ НА ПЛОСКОСТЬ
-				Pair coordsX = new Pair(blockPos.getY(), blockPos.getZ());
-				Pair coordsY = new Pair(blockPos.getX(), blockPos.getZ());
-				Pair coordsZ = new Pair(blockPos.getX(), blockPos.getY());
-
-				//НАХОЖДЕНИЕ ПАРАМЕТРОВ ВОРОНКИ
-				if (sizeX.containsKey(coordsX)) {
-					if (sizeX.get(coordsX).a > blockPos.getX()) sizeX.get(coordsX).a = blockPos.getX();
-					if (sizeX.get(coordsX).b < blockPos.getX()) sizeX.get(coordsX).a = blockPos.getX();
-					sizeX.get(coordsX).c += 1;
-				} else {
-					Triple x = new Triple(blockPos.getX(), blockPos.getX(), 1);
-					sizeX.put(coordsX, x);
-				}
-				if (sizeY.containsKey(coordsY)) {
-					if (sizeY.get(coordsY).a > blockPos.getY()) sizeY.get(coordsY).a = blockPos.getY();
-					if (sizeY.get(coordsY).b < blockPos.getY()) sizeY.get(coordsY).a = blockPos.getY();
-					sizeY.get(coordsY).c += 1;
-				} else {
-					Triple y = new Triple(blockPos.getY(), blockPos.getY(), 1);
-					sizeY.put(coordsY, y);
-				}
-				if (sizeZ.containsKey(coordsZ)) {
-					if (sizeZ.get(coordsZ).a > blockPos.getZ()) sizeZ.get(coordsZ).a = blockPos.getZ();
-					if (sizeZ.get(coordsZ).b < blockPos.getZ()) sizeZ.get(coordsZ).a = blockPos.getZ();
-					sizeZ.get(coordsZ).c += 1;
-				} else {
-					Triple z = new Triple(blockPos.getZ(), blockPos.getZ(), 1);
-					sizeZ.put(coordsZ, z);
-				}
-				
-				//ЗАМЕНА ВЗОРВАННОГО БЛОКА НА ЕГО СЛОМАННУЮ ВЕРСИЮ
-				BlockState newBlockState = crackedDictionary.get(world.getBlockState(blockPos).getBlock().getRegistryName().toString());
-				if (newBlockState != null) world.setBlockState(blockPos, newBlockState);
-				
-				//ЗАМЕНЯЕМ БЛОКИ ВОКРУГ ВЗОРВАННОГО БЛОКА ЕСЛИ ОНИ НЕ ВЗОРВУТСЯ
-				changeBlock(world, blocksPos, blockPos.up());
-				changeBlock(world, blocksPos, blockPos.down());
-				changeBlock(world, blocksPos, blockPos.east());
-				changeBlock(world, blocksPos, blockPos.west());
-				changeBlock(world, blocksPos, blockPos.south());
-				changeBlock(world, blocksPos, blockPos.north());
-			}
-			
-			//ПЕРЕМЕННЫЕ ДЛЯ ОБРАБОТКИ БЛОКОВ
-			double k = 0;
-			double dx = 0;
-			double dy = 0;
-			double dz = 0;
-			double distance = 0;
-			
-			//(Y, Z), (Xmin, Xmax, Xlen)
-			for (Entry<Pair, Triple> entry : sizeX.entrySet()) {
-				for (int i = 1; i <= entry.getValue().c; i++) {
-					BlockPos min = new BlockPos(entry.getValue().a-i+0.5D, entry.getKey().a, entry.getKey().b+0.5D);
-					BlockPos max = new BlockPos(entry.getValue().b+i+0.5D, entry.getKey().a, entry.getKey().b+0.5D);
-					if (!canBlockBeExploded(world, min)) continue;
-					if (!canBlockBeExploded(world, max)) continue;
-					setFBEVelocity(min, center, world, k, dx, dy, dz, distance);
-					setFBEVelocity(max, center, world, k, dx, dy, dz, distance);
-				}
-		    }
-			
-			//(X, Z), (Ymin, Ymax, Ylen)
-			for (Entry<Pair, Triple> entry : sizeY.entrySet()) {
-				for (int i = 1; i <= entry.getValue().c; i++) {
-					BlockPos min = new BlockPos(entry.getKey().a+0.5D, entry.getValue().a-i, entry.getKey().b+0.5D);
-					BlockPos max = new BlockPos(entry.getKey().a+0.5D, entry.getValue().b+i, entry.getKey().b+0.5D);
-					if (!canBlockBeExploded(world, min)) continue;
-					if (!canBlockBeExploded(world, max)) continue;
-					setFBEVelocity(min, center, world, k, dx, dy, dz, distance);
-					setFBEVelocity(max, center, world, k, dx, dy, dz, distance);
-				}
-		    }
-			
-			//(X, Y), (Zmin, Zmax, Zlen)
-			for (Entry<Pair, Triple> entry : sizeZ.entrySet()) {
-				for (int i = 1; i <= entry.getValue().c; i++) {
-					BlockPos min = new BlockPos(entry.getKey().a+0.5D, entry.getKey().b, entry.getValue().a-i+0.5D);
-					BlockPos max = new BlockPos(entry.getKey().a+0.5D, entry.getKey().b, entry.getValue().b+i+0.5D);
-					if (!canBlockBeExploded(world, min)) continue;
-					if (!canBlockBeExploded(world, max)) continue;
-					setFBEVelocity(min, center, world, k, dx, dy, dz, distance);
-					setFBEVelocity(max, center, world, k, dx, dy, dz, distance);
-				}
-		    }
-		}
-	}
-	
-	//УСТАНОВКА ПАДАЮЩЕМУ БЛОКУ СКОРОСТИ
-	public static void setFBEVelocity(BlockPos blockPos, Vec3d center, World world, double k, double dx, double dy, double dz, double distance) {
-		FallingBlockEntity FBE = new FallingBlockEntity(world, blockPos.getX(), blockPos.getY(), blockPos.getZ(), world.getBlockState(blockPos));
-		FBE.setVelocity(k*dx/distance, k*dy/distance, k*dz/distance);
-		world.addEntity(FBE);
-	}
-	
-	//ЗАМЕНА БЛОКА
-	public static void changeBlock(World world, List<BlockPos> blocksPos, BlockPos blockPos) {
-		if (!blocksPos.contains(blockPos) && world.rand.nextFloat() > 0.4) {
-			BlockState newBlockState = crackedDictionary.get(world.getBlockState(blockPos).getBlock().getRegistryName().toString());
-			if (newBlockState != null) world.setBlockState(blockPos, newBlockState);
-		}
-	}
-
-	//МОЖЕТ ЛИ БЛОК БЫТЬ ВЗОРВАН
-	public static boolean canBlockBeExploded(World world, BlockPos blockPos) {
-		return 
-		   world.getBlockState(blockPos).getBlock() != Blocks.AIR
-		|| world.getBlockState(blockPos).getBlock() != Blocks.BEDROCK
-		|| world.getBlockState(blockPos).getBlock() != Blocks.COMMAND_BLOCK
-		|| world.getBlockState(blockPos).getBlock() != Blocks.CHAIN_COMMAND_BLOCK
-		|| world.getBlockState(blockPos).getBlock() != Blocks.REPEATING_COMMAND_BLOCK
-		|| world.getBlockState(blockPos).getBlock() != Blocks.STRUCTURE_BLOCK
-		|| world.getBlockState(blockPos).getBlock() != Blocks.STRUCTURE_VOID
-		|| world.getBlockState(blockPos).getBlock() != Blocks.BARRIER;
-	}
-	
-	//ПИШЕМ В ЧАТ
-	public static void writeToChat(World world, Object object) {
-		List<? extends PlayerEntity> players = world.getWorld().getPlayers();
-		for (PlayerEntity player : players) {
-			player.sendMessage(new StringTextComponent(object.toString()));
-
-		}
-	}
-	
-	//СЛОВАРЬ СООТВЕТСТВИЙ БЛОКОВ
-
-	//ДОБАВЛЕНИЕ СООТВЕТСТВИЙ БЛОКОВ В СЛОВАРЬ И ПРОВЕРКА НА СУЩЕСТВОВАНИЕ БЛОКА
-	
-	//ДОБАВЛЕНИЕ СООТВЕТСТВИЙ БЛОКОВ В СЛОВАРЬ ПРИ ЗАГРУЗКЕ МАЙНКРАФТА
-
-}
-*/
