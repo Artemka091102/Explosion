@@ -10,9 +10,11 @@ import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.item.FallingBlockEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.text.StringTextComponent;
 import net.minecraft.world.Explosion;
 import net.minecraft.world.World;
 
@@ -84,7 +86,7 @@ public class EventsHandler {
 				if (fallBlocksNearCrater && flyBlocksNearCrater) {
 					if (canFlyThrough(world.getBlockState(getNearBlock(GarbageBlockPos, i)))) {
 						degradeBlock(world, GarbageBlockPos, degradedBlocksPos, 1F);
-						fallBlock(world, GarbageBlockPos, calculateVelocity(GarbageBlockPos, center, 4));
+						fallBlock(world, GarbageBlockPos, calculateVelocity(GarbageBlockPos, center, world.getBlockState(GarbageBlockPos).getHarvestLevel()+2));
 					} else {
 						degradeBlock(world, GarbageBlockPos, degradedBlocksPos, 0.3F);
 					}
@@ -136,7 +138,7 @@ public class EventsHandler {
 		double dy = blockPos.getY() - center.y;
 		double dz = blockPos.getZ() - center.z;
 		double distance = dx*dx+dy*dy+dz*dz;
-		return new Vec3d(k*dx/distance, k*dy/distance, k*dz/distance);
+		return new Vec3d((2*dx)/(distance*k), (2*dy)/(distance*k), (2*dz)/(distance*k));
 	}
 	
 	//МОЖНО ЛИ ПРОЛЕТЕТЬ СКВОЗЬ БЛОК
@@ -147,6 +149,14 @@ public class EventsHandler {
 				|| blockState.getMaterial().isReplaceable();
 	}
 
+	//ПИШЕМ В ЧАТ
+	public static void writeToChat(World world, Object object) {
+		List<? extends PlayerEntity> players = world.getWorld().getPlayers();
+		for (PlayerEntity player : players) {
+			player.sendMessage(new StringTextComponent(object.toString()));
+		}
+	}
+	
 	//МОЖЕТ ЛИ БЛОК БЫТЬ ОБРАБОТАН МОДОМ
 	private static boolean canBlockBeExploded(Block block) {
 		return block != Blocks.AIR
