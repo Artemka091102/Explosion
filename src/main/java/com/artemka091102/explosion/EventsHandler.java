@@ -24,76 +24,73 @@ import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.minecraftforge.fml.event.lifecycle.FMLLoadCompleteEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 
+
+
 @EventBusSubscriber(modid = Main.MODID, bus=EventBusSubscriber.Bus.FORGE)
 public class EventsHandler {
-	
 	//СЛОВАРЬ ПАР БЛОКОВ
 	private static final HashMap<String, BlockState> crackedDictionary = new HashMap<String, BlockState>();
-
 	//СПИСОК ДЕГРАДИРОВАННЫХ БЛОКОВ
 	private static HashSet<BlockPos> degradedBlocksPos;
-
 	//ПЕРЕМЕННЫЕ ИЗ КОНФИГА
 	private static boolean fallBlocksNearCrater = ExplosionSettings.fallBlocksNearCrater.get();
 	private static boolean flyBlocksNearCrater = ExplosionSettings.flyBlocksNearCrater.get();
 
-	//МУСОРНЫЕ ПЕРЕМЕННЫЕ
-	private static BlockPos GarbageBlockPos = new BlockPos(0, -1, 0);
+
 
 	//ОБРАБОТКА ВЗРЫВА
 	@SubscribeEvent
 	public static void explosion(ExplosionEvent event) {
-		
 		//МИР В КОТОРОМ ВЗРЫВ
 		World world = event.getWorld();
-
 		//ЕСЛИ МЫ НА КЛИЕНТЕ ВЫХОДИМ 
 		if (world.isRemote) return;
-		
 		//НЕОБХОДИМЫЕ ПЕРЕМЕННЫЕ
 		Explosion explosion = event.getExplosion();
 		List<BlockPos> blocksPos = explosion.getAffectedBlockPositions();
 		Vec3d center = explosion.getPosition();
 		degradedBlocksPos = new HashSet<BlockPos>();
-		
 		//ПЕРЕБИРАЕМ ВСЕ БЛОКИ ИЗ ВОРОНКИ
 		for (BlockPos blockPos : blocksPos) {
-
 			//МЕНЯЕМ БЛОК ВНУТРИ ВОРОНКИ
 			degradeBlock(world, blockPos, degradedBlocksPos, 1F);
-			
 			//РАБОТАЕМ С БЛОКАМИ ВОКРУГ ВОРОНКИ ЕСЛИ ХОТЬ ЧТО-ТО НАДО
 			if (fallBlocksNearCrater || flyBlocksNearCrater) {
 				prepareBlocksNearBlock(world, blockPos, blocksPos, center);
 			}
 		}
 	}
-	
-	private static void prepareBlocksNearBlock(World world, BlockPos blockPos, List<BlockPos> blocksPos, Vec3d center) {
-		for (int i = 0; i < 6; i++) {
-			GarbageBlockPos = getNearBlock(blockPos, i);
-			if (!blocksPos.contains(GarbageBlockPos)) {
 
-				//РОНЯЕМ БЛОКИ ВОКРУГ ВОРОНКИ
-				if (fallBlocksNearCrater && !flyBlocksNearCrater) {
-					degradeBlock(world, GarbageBlockPos, degradedBlocksPos, 0.3F);
-					if (canFlyThrough(world.getBlockState(getNearBlock(GarbageBlockPos, 4)))) {
-						fallBlock(world, GarbageBlockPos, Vec3d.ZERO);
-					}
+
+
+	private static void prepareBlocksNearBlock(World world, BlockPos blockPos, List<BlockPos> blocksPos, Vec3d center) {
+		//ВРЕМЕННАЯ ПЕРЕМЕННАЯ ДЛЯ ХРАНЕНИЯ КООРДИНАТЫ БЛОКА РЯДОМ С ДАННЫМ
+		BlockPos newBlockPos = new BlockPos(0, -1, 0);
+		for (int i = 0; i < 6; i++) {
+			//ЗАПОМИНАЕМ БЛОК РЯДОМ
+			newBlockPos = getNearBlock(blockPos, i);
+			//ЕСЛИ ОН БУДЕТ ВЗОРВАН ВЫХОДИМ
+			if (blocksPos.contains(newBlockPos)) continue;
+			//ОТПРАВЛЯЕМ ЭТИ БЛОКИ ЛЕТЕТЬ
+			if (fallBlocksNearCrater && flyBlocksNearCrater) {
+				if (canFlyThrough(world.getBlockState(getNearBlock(newBlockPos, i)))) {
+					degradeBlock(world, newBlockPos, degradedBlocksPos, 1F);					
+					fallBlock(world, newBlockPos, calculateVelocity(blockPosToVec3d(newBlockPos), vec3dRound(center, 10) , 1, world.getBlockState(newBlockPos).getHarvestLevel()+2));
+				} else {
+					degradeBlock(world, newBlockPos, degradedBlocksPos, 0.3F);
 				}
-			
-				//ОТПРАВЛЯЕМ ЭТИ БЛОКИ ЛЕТЕТЬ
-				if (fallBlocksNearCrater && flyBlocksNearCrater) {
-					if (canFlyThrough(world.getBlockState(getNearBlock(GarbageBlockPos, i)))) {
-						degradeBlock(world, GarbageBlockPos, degradedBlocksPos, 1F);
-						fallBlock(world, GarbageBlockPos, calculateVelocity(GarbageBlockPos, center, world.getBlockState(GarbageBlockPos).getHarvestLevel()+2));
-					} else {
-						degradeBlock(world, GarbageBlockPos, degradedBlocksPos, 0.3F);
-					}
+			}
+			//РОНЯЕМ БЛОКИ ВОКРУГ ВОРОНКИ ЕСЛИ НЕ НУЖНО ВЫКИДЫВАТЬ ИХ
+			if (fallBlocksNearCrater && !flyBlocksNearCrater) {
+				degradeBlock(world, newBlockPos, degradedBlocksPos, 0.3F);
+				if (canFlyThrough(world.getBlockState(getNearBlock(newBlockPos, 4)))) {
+					fallBlock(world, newBlockPos, Vec3d.ZERO);
 				}
 			}
 		}
 	}
+
+
 
 	//ПОЛУЧЕНИЕ МАССИВА БЛОКОВ РЯДОМ С ДАННЫМ
 	private static BlockPos getNearBlock(BlockPos blockPos, int i) {
@@ -105,42 +102,64 @@ public class EventsHandler {
 		if (i == 5) return blockPos.north();
 		return new BlockPos(0, 0, 0);
 	}
-	
+
+
+
+	//BLOCKPOS В VEC3D
+	private static Vec3d blockPosToVec3d(BlockPos blockPos) {
+		return new Vec3d(blockPos.getX()+0.5, blockPos.getY(), blockPos.getZ()+0.5);
+	}
+
+
+
+	//ОКРУГЛЕНИЕ VEC3D
+	private static Vec3d vec3dRound (Vec3d vec, int k) {
+		return new Vec3d(Math.round(vec.getX()*k)/k,
+				Math.round(vec.getY()*k)/k,
+				Math.round(vec.getZ()*k)/k);
+	}
+
+
+
 	//ДЕГРАДАЦИЯ БЛОКА ПО КООРДИНАТАМ
 	private static void degradeBlock(World world, BlockPos blockPos, HashSet<BlockPos> degradedBlocksPos, float chance) {
-		
 		//ПРОВЕРЯЕМ РАНДОМ И ЕСТЬ ЛИ БЛОК В ОБРАБОТАННЫХ
 		if (world.getRandom().nextFloat() > chance || degradedBlocksPos.contains(blockPos)) return;
-		
-		//ЗАМЕНЯЕМ БЛОК ЕСЛИ МАПА ВЕРНУЛА НЕ НОЛЬ И ЕСЛИ ПОВЕЗЛО
+		//ПОЛУЧАЕМ НОВЫЙ БЛОК ИЗ СПИСКА И ЕСЛИ ЕГО НЕТ ВЫХОДИМ
 		BlockState newBlockState = crackedDictionary.get(world.getBlockState(blockPos).getBlock().getRegistryName().toString());
-		if (newBlockState != null) {
-			world.setBlockState(blockPos, newBlockState);
-			degradedBlocksPos.add(blockPos);
-		}
+		if (newBlockState == null) return;
+		//ЗАМЕНЯЕМ БЛОК В МИРЕ И ДОБАВЛЯЕМ ЕГО В ИЗМЕНЕННЫЕ
+		world.setBlockState(blockPos, newBlockState);
+		degradedBlocksPos.add(blockPos);
 	}
+
+
 
 	//ПАДЕНИЕ БЛОКА
 	private static void fallBlock(World world, BlockPos blockPos, Vec3d velocity) {
-		
-		//ЕСЛИ БЛОК НЕ МОЖЕТ БЫТЬ ОБРАБОТАН МОДОМ
+		//ЕСЛИ БЛОК НЕ МОЖЕТ БЫТЬ ОБРАБОТАН МОДОМ ВЫХОДИМ
 		if(!canBlockBeExploded(world.getBlockState(blockPos).getBlock())) return;
-		
 		//СОЗДАНИЕ ЭНТИТИ И ВЫДАЧА СКОРОСТИ
 		FallingBlockEntity FBE = new FallingBlockEntity(world, blockPos.getX(), blockPos.getY(), blockPos.getZ(), world.getBlockState(blockPos));
 		FBE.setVelocity(velocity.x, velocity.y, velocity.z);
 		world.addEntity(FBE);
 	}
 
+
+
 	//РАСЧЕТ СКОРОСТИ
-	private static Vec3d calculateVelocity(BlockPos blockPos, Vec3d center, double k) {
-		double dx = blockPos.getX() - center.x;
-		double dy = blockPos.getY() - center.y;
-		double dz = blockPos.getZ() - center.z;
+	private static Vec3d calculateVelocity(Vec3d pos, Vec3d center, double numerator, double denominator) {
+		double dx = pos.x - center.x;
+		double dy = pos.y - center.y;
+		double dz = pos.z - center.z;
 		double distance = dx*dx+dy*dy+dz*dz;
-		return new Vec3d((2*dx)/(distance*k), (2*dy)/(distance*k), (2*dz)/(distance*k));
+		return new Vec3d((numerator*dx)/(distance*denominator),
+				(numerator*dy)/(distance*denominator),
+				(numerator*dz)/(distance*denominator));
 	}
-	
+
+
+
 	//МОЖНО ЛИ ПРОЛЕТЕТЬ СКВОЗЬ БЛОК
 	public static boolean canFlyThrough(BlockState blockState) {
 		return blockState.getBlock() == Blocks.AIR
@@ -149,6 +168,8 @@ public class EventsHandler {
 				|| blockState.getMaterial().isReplaceable();
 	}
 
+
+
 	//ПИШЕМ В ЧАТ
 	public static void writeToChat(World world, Object object) {
 		List<? extends PlayerEntity> players = world.getWorld().getPlayers();
@@ -156,7 +177,9 @@ public class EventsHandler {
 			player.sendMessage(new StringTextComponent(object.toString()));
 		}
 	}
-	
+
+
+
 	//МОЖЕТ ЛИ БЛОК БЫТЬ ОБРАБОТАН МОДОМ
 	private static boolean canBlockBeExploded(Block block) {
 		return block != Blocks.AIR
@@ -169,6 +192,8 @@ public class EventsHandler {
 				&& block != Blocks.BARRIER;
 	}
 
+
+
 	//ДОБАВЛЕНИЕ ПАР БЛОКОВ В СЛОВАРЬ
 	private static void putToDictionary(String oldBlockRegName, String newBlockRegName) {
 		Block newBlock = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(newBlockRegName));
@@ -178,10 +203,11 @@ public class EventsHandler {
 		}
 	}
 
+
+
 	//ОБРАБОТКА ЗАПУСКА МАЙНКРАФТА
 	@SubscribeEvent
 	public static void onCommonSetup(FMLLoadCompleteEvent event) {
-
 		//ЗАПОЛНЯЕМ СЛОВАРЬ ПАР БЛОКОВ С ПРОВЕРКОЙ
 		putToDictionary("wildnature:basalt_slab", "wildnature:basalt_slab_cobble");
 		putToDictionary("wildnature:basalt_slab_bricks", "wildnature:basalt_slab_bricks_cracked");
