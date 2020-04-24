@@ -138,13 +138,15 @@ public class EventsHandler {
         world.addEntity(FBE);
     }
 
+    const int speedConstant = 2;
     //РАСЧЕТ СКОРОСТИ
     private static Vec3d calculateVelocity(BlockPos blockPos, Vec3d center, double k) {
         double dx = blockPos.getX() - center.x;
         double dy = blockPos.getY() - center.y;
         double dz = blockPos.getZ() - center.z;
         double distance = dx * dx + dy * dy + dz * dz;
-        return new Vec3d((2 * dx) / (distance * k), (2 * dy) / (distance * k), (2 * dz) / (distance * k));
+        return new Vec3d((speedConstant * dx) / (distance * k), (speedConstant * dy) / (distance * k),
+                (speedConstant * dz) / (distance * k));
     }
 
     //МОЖНО ЛИ ПРОЛЕТЕТЬ СКВОЗЬ БЛОК
