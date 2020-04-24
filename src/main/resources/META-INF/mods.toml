@@ -18,18 +18,23 @@ version="${file.jarVersion}" #mandatory
  # A display name for the mod
 displayName="Explosion" #mandatory
 # A URL to query for updates for this mod. See the JSON update specification <here>
-updateJSONURL="https://github.com/Artemka091102/Explosion/blob/master/src/main/resources/META-INF/update.json" #optional
+updateJSONURL="https://raw.githubusercontent.com/Artemka091102/Explosion/master/src/main/resources/META-INF/update.json" #optional
 # A URL for the "homepage" for this mod, displayed in the mod UI
 # displayURL="http://explosion.com/" #optional
 # A file name (in the root of the mod JAR) containing a logo for display
 # logoFile="explosion.png" #optional
 # A text field displayed in the mod UI
 credits='''
+
 _romanchick_: helps in coding
 Pugemon: helps in testing
 ''' #optional
 # A text field displayed in the mod UI
-authors="Artemka091102, FlyMaster" #optional
+authors='''
+
+Artemka091102
+FlyMaster
+''' #optional
 # The description text for the mod (multi line!) (#mandatory)
 description='''
 This mod makes blocks degradate after explosion. Write your questions @Artemka091102#6675
