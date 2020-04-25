@@ -1,3 +1,5 @@
+// This is an open source non-commercial project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: http://www.viva64.com
 package com.artemka091102.explosion;
 
 import java.util.HashMap;
@@ -23,8 +25,6 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.minecraftforge.fml.event.lifecycle.FMLLoadCompleteEvent;
 import net.minecraftforge.registries.ForgeRegistries;
-
-
 
 @EventBusSubscriber(modid = Main.MODID, bus=EventBusSubscriber.Bus.FORGE)
 public class EventsHandler {
