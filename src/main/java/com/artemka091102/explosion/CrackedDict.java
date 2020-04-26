@@ -14,7 +14,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 @EventBusSubscriber(modid = Main.MODID, bus=EventBusSubscriber.Bus.FORGE)
 public class CrackedDict {
 
-	public static final HashMap<String, BlockState> DICT = new HashMap<String, BlockState>();
+	private static final HashMap<String, BlockState> DICT = new HashMap<String, BlockState>();
 
 	private static void putToDict(String oldBlockRegName, String newBlockRegName) {
 		Block newBlock = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(newBlockRegName));
@@ -22,6 +22,10 @@ public class CrackedDict {
 		if (newBlock != Blocks.AIR && oldBlock != Blocks.AIR) {
 			DICT.put(oldBlockRegName, newBlock.getDefaultState());
 		}
+	}
+
+	public static BlockState get(String key) {
+		return DICT.get(key);
 	}
 
 	@SubscribeEvent
