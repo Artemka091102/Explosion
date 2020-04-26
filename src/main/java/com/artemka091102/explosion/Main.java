@@ -10,18 +10,10 @@ import net.minecraftforge.fml.loading.FMLPaths;
 
 @Mod(Main.MODID)
 public class Main {
-	
-	//КОНСТРУКТОР КЛАССА
 	public Main() {
-		
-		//ЗАГРУЗКА КОНФИГА
 		ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.config);
         Config.loadConfig(Config.config, FMLPaths.CONFIGDIR.get().resolve("explosion-common.toml").toString());
-
-        //ПОДКЛЮЧЕНИЕ ШИНЫ СОБЫТИЙ FML
-        FMLJavaModLoadingContext.get().getModEventBus().addListener(EventsHandler::onCommonSetup);   
+        FMLJavaModLoadingContext.get().getModEventBus().addListener(CrackedDict::onCommonSetup);   
 	}
-
-	//ID МОДА
     public static final String MODID = "explosion";
 }
