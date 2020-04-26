@@ -10,17 +10,18 @@ import net.minecraftforge.fml.common.Mod;
 
 @Mod.EventBusSubscriber
 public class Config {
-	private static final ForgeConfigSpec.Builder Builder = new ForgeConfigSpec.Builder();
-	public static final ForgeConfigSpec config;
-	
-	static {
-		ExplosionSettings.init(Builder);
-		config = Builder.build();
-	}
-	
-	public static void loadConfig(ForgeConfigSpec config, String path) {
-		final CommentedFileConfig file = CommentedFileConfig.builder(new File(path)).sync().autosave().writingMode(WritingMode.REPLACE).build();
-		file.load();
-		config.setConfig(file);
-	}
+    private static final ForgeConfigSpec.Builder Builder = new ForgeConfigSpec.Builder();
+    public static final ForgeConfigSpec config;
+
+    static {
+        ExplosionSettings.init(Builder);
+        config = Builder.build();
+    }
+
+    public static void loadConfig(ForgeConfigSpec config, String path) {
+        final CommentedFileConfig file =
+				CommentedFileConfig.builder(new File(path)).sync().autosave().writingMode(WritingMode.REPLACE).build();
+        file.load();
+        config.setConfig(file);
+    }
 }
