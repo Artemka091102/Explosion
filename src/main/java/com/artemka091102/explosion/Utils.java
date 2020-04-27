@@ -1,6 +1,9 @@
+// This is an open source non-commercial project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: http://www.viva64.com
 package com.artemka091102.explosion;
 
 import java.util.HashSet;
+import java.util.Objects;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
@@ -14,7 +17,7 @@ import net.minecraft.world.World;
 
 public class Utils {
 
-    public static final HashSet<BlockPos> degradedBlocksPos = new HashSet<BlockPos>();
+    public static final HashSet<BlockPos> degradedBlocksPos = new HashSet<>();
 
     /**
      * Writes something to chat
@@ -22,6 +25,7 @@ public class Utils {
      * @param world  - needs to detect players
      * @param object - may be anything, this will be written to chat
      */
+    @SuppressWarnings("unused")
     public static void writeToChat(World world, Object object) {
         for (PlayerEntity player : world.getWorld().getPlayers()) {
             player.sendMessage(new StringTextComponent(object.toString()));
@@ -75,15 +79,15 @@ public class Utils {
      * @param block - block which can or can't be exploded
      * @return true if can, false if can't
      */
-    public static boolean canBeExploded(Block block) {
-        return block != Blocks.AIR
-                && block != Blocks.BEDROCK
-                && block != Blocks.COMMAND_BLOCK
-                && block != Blocks.CHAIN_COMMAND_BLOCK
-                && block != Blocks.REPEATING_COMMAND_BLOCK
-                && block != Blocks.STRUCTURE_BLOCK
-                && block != Blocks.STRUCTURE_VOID
-                && block != Blocks.BARRIER;
+    public static boolean canNotBeExploded(Block block) {
+        return block == Blocks.AIR
+                || block == Blocks.BEDROCK
+                || block == Blocks.COMMAND_BLOCK
+                || block == Blocks.CHAIN_COMMAND_BLOCK
+                || block == Blocks.REPEATING_COMMAND_BLOCK
+                || block == Blocks.STRUCTURE_BLOCK
+                || block == Blocks.STRUCTURE_VOID
+                || block == Blocks.BARRIER;
     }
 
     /**
@@ -109,7 +113,7 @@ public class Utils {
     public static void degradeBlock(World world, BlockPos blockPos, float chance) {
         if (world.rand.nextFloat() > chance || degradedBlocksPos.contains(blockPos)) return;
         BlockState newBlockState =
-				CrackedDict.get(world.getBlockState(blockPos).getBlock().getRegistryName().toString());
+				CrackedDict.get(Objects.requireNonNull(world.getBlockState(blockPos).getBlock().getRegistryName()).toString());
         if (newBlockState == null) return;
         world.setBlockState(blockPos, newBlockState);
         degradedBlocksPos.add(blockPos);
@@ -125,7 +129,7 @@ public class Utils {
     /**
      * Returns something's motion vector after explosion
      *
-     * @param reclinedPos  - something's position
+     * @param blockPos  - something's position
      * @param explosionPos - explosion's position
      * @param multiplier   - vector's multiplier
      * @return motion vector

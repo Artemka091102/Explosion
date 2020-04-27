@@ -1,6 +1,10 @@
+// This is an open source non-commercial project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: http://www.viva64.com
+
 package com.artemka091102.explosion;
 
 import java.util.HashMap;
+import java.util.Objects;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
@@ -14,13 +18,14 @@ import net.minecraftforge.registries.ForgeRegistries;
 @EventBusSubscriber(modid = Main.MODID, bus = EventBusSubscriber.Bus.FORGE)
 public class CrackedDict {
 
-    private static final HashMap<String, BlockState> DICT = new HashMap<String, BlockState>();
+    private static final HashMap<String, BlockState> DICT = new HashMap<>();
+
 
     private static void putToDict(String oldBlockRegName, String newBlockRegName) {
         Block newBlock = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(newBlockRegName));
         Block oldBlock = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(oldBlockRegName));
         if (newBlock != Blocks.AIR && oldBlock != Blocks.AIR) {
-            DICT.put(oldBlockRegName, newBlock.getDefaultState());
+            DICT.put(oldBlockRegName, Objects.requireNonNull(newBlock).getDefaultState());
         }
     }
 
