@@ -80,14 +80,7 @@ public class Utils {
      * @return true if can, false if can't
      */
     public static boolean canNotBeExploded(Block block) {
-        return block == Blocks.AIR
-                || block == Blocks.BEDROCK
-                || block == Blocks.COMMAND_BLOCK
-                || block == Blocks.CHAIN_COMMAND_BLOCK
-                || block == Blocks.REPEATING_COMMAND_BLOCK
-                || block == Blocks.STRUCTURE_BLOCK
-                || block == Blocks.STRUCTURE_VOID
-                || block == Blocks.BARRIER;
+        return !block.getDefaultState().getMaterial().blocksMovement();
     }
 
     /**
