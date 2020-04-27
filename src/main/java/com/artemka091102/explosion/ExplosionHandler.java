@@ -22,23 +22,23 @@ public class ExplosionHandler {
         List<BlockPos> blocksPos = explosion.getAffectedBlockPositions();
         Vec3d explosionPos = explosion.getPosition();
         World world = event.getWorld();
-    	BlockPos newBlockPos;
-    	Block newBlock;
+        BlockPos newBlockPos;
+        Block newBlock;
         for (BlockPos blockPos : blocksPos) {
             for (int i = 0; i < 6; i++) {
-            	newBlockPos = Utils.blockPosNearby(blockPos, i);
-            	newBlock = world.getBlockState(newBlockPos).getBlock();
+                newBlockPos = Utils.blockPosNearby(blockPos, i);
+                newBlock = world.getBlockState(newBlockPos).getBlock();
                 if (Utils.canNotBeExploded(newBlock)) continue;
-            	if (Utils.canPassThrough(world.getBlockState(Utils.blockPosNearby(newBlockPos, i)).getBlock())) {
-            		Utils.degradeBlock(world, newBlockPos, 1);
-            		Utils.throwBlock(world, newBlockPos,
-            				Utils.motion(Utils.centerOfBlock(newBlockPos), Utils.roundVec3d(explosionPos, 1),
-            						1.0 / (world.getBlockState(newBlockPos).getHarvestLevel()+2)));
-            	} else {
-            		Utils.degradeBlock(world, newBlockPos, 0.5F);
-            	}
+                if (Utils.canPassThrough(world.getBlockState(Utils.blockPosNearby(newBlockPos, i)).getBlock())) {
+                    Utils.degradeBlock(world, newBlockPos, 1);
+                    Utils.throwBlock(world, newBlockPos,
+                            Utils.motion(Utils.centerOfBlock(newBlockPos), Utils.roundVec3d(explosionPos, 1),
+                                    1.0 / (world.getBlockState(newBlockPos).getHarvestLevel() + 2)));
+                } else {
+                    Utils.degradeBlock(world, newBlockPos, 0.5F);
+                }
             }
-        	newBlock = world.getBlockState(blockPos).getBlock();
+            newBlock = world.getBlockState(blockPos).getBlock();
             if (Utils.canNotBeExploded(newBlock)) continue;
             Utils.degradeBlock(world, blockPos, 1);
         }
