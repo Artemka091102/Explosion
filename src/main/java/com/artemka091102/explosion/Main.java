@@ -10,6 +10,5 @@ public class Main {
     public Main() {
         FMLJavaModLoadingContext.get().getModEventBus().addListener(CrackedDict::onCommonSetup);
     }
-
     public static final String MODID = "explosion";
 }
