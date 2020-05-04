@@ -19,28 +19,28 @@ import net.minecraftforge.registries.ForgeRegistries;
 @EventBusSubscriber(modid = Main.MODID, bus = EventBusSubscriber.Bus.FORGE)
 public class ModsController {
 
-    private static final HashMap<String, BlockState> DICT = new HashMap<>();
+    private static final HashMap<String, BlockState> CrackedDict = new HashMap<>();
 
     private static boolean acceptChanges = true;
 
-    public static void putToDict(String oldBlockRegName, String newBlockRegName) {
+    public static void putToCrackedDict(String oldBlockRegName, String newBlockRegName) {
         if (!acceptChanges)
             return;
         Block newBlock = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(newBlockRegName));
         Block oldBlock = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(oldBlockRegName));
         if (newBlock != Blocks.AIR && oldBlock != Blocks.AIR) {
-            DICT.put(oldBlockRegName, Objects.requireNonNull(newBlock).getDefaultState());
+            CrackedDict.put(oldBlockRegName, Objects.requireNonNull(newBlock).getDefaultState());
         }
     }
 
-    public static BlockState get(String key) {
-        return DICT.get(key);
+    public static BlockState getFromCrackedDict(String key) {
+        return CrackedDict.get(key);
     }
 
     @SubscribeEvent
     public static void onCommonSetup(FMLLoadCompleteEvent event) {
-        Minecraft.SetupCrackedDict();
-        WildNature.SetupCrackedDict();
+        Minecraft.Setup();
+        WildNature.Setup();
         acceptChanges = false;
     }
 }

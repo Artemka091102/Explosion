@@ -106,7 +106,7 @@ public class Utils {
     public static void degradeBlock(World world, BlockPos blockPos, float chance) {
         if (world.rand.nextFloat() > chance || degradedBlocksPos.contains(blockPos)) return;
         BlockState newBlockState =
-                ModsController.get(Objects.requireNonNull(world.getBlockState(blockPos).getBlock().getRegistryName()).toString());
+                ModsController.getFromCrackedDict(Objects.requireNonNull(world.getBlockState(blockPos).getBlock().getRegistryName()).toString());
         if (newBlockState == null) return;
         world.setBlockState(blockPos, newBlockState);
         degradedBlocksPos.add(blockPos);
