@@ -8,6 +8,7 @@ import java.util.Objects;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
+import net.minecraft.block.material.PushReaction;
 import net.minecraft.entity.item.FallingBlockEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.math.BlockPos;
@@ -80,7 +81,7 @@ public class Utils {
      * @return true if can, false if can't
      */
     public static boolean canNotBeExploded(Block block) {
-        return !block.getDefaultState().getMaterial().blocksMovement();
+        return block.getDefaultState().getMaterial().getPushReaction() == PushReaction.DESTROY;
     }
 
     /**
