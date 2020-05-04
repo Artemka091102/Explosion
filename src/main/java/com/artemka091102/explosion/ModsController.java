@@ -17,7 +17,7 @@ import net.minecraftforge.fml.event.lifecycle.FMLLoadCompleteEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 
 @EventBusSubscriber(modid = Main.MODID, bus = EventBusSubscriber.Bus.FORGE)
-public class CrackedDict {
+public class ModsController {
 
     private static final HashMap<String, BlockState> DICT = new HashMap<>();
 

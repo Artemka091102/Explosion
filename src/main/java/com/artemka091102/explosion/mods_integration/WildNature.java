@@ -1,5 +1,5 @@
 package com.artemka091102.explosion.mods_integration;
-import static com.artemka091102.explosion.CrackedDict.putToDict;
+import static com.artemka091102.explosion.ModsController.putToDict;
 public class WildNature {
     public static void SetupCrackedDict() {
         putToDict("wildnature:basalt_slab", "wildnature:basalt_slab_cobble");

@@ -1,8 +1,8 @@
 package com.artemka091102.explosion.mods_integration;
 
-import com.artemka091102.explosion.CrackedDict;
+import com.artemka091102.explosion.ModsController;
 
-import static com.artemka091102.explosion.CrackedDict.putToDict;
+import static com.artemka091102.explosion.ModsController.putToDict;
 
 public class Minecraft {
     public static void SetupCrackedDict() {
