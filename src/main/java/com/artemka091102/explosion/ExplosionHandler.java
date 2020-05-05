@@ -31,26 +31,28 @@ public class ExplosionHandler {
                 newBlock = world.getBlockState(newBlockPos).getBlock();
                 //if we cant do anything continue
                 if (Utils.canNotBeExploded(newBlock)) continue;
-                //if we can fly through block behind
-                if (Utils.canPassThrough(world.getBlockState(Utils.blockPosNearby(newBlockPos, i)).getBlock())) {
-                    //if physics is off exit
-                    if(Utils.physics) {
+                //if physics is on
+                if(Utils.physics) {
+                    //if we can fly through block behind
+                    if (Utils.canPassThrough(world.getBlockState(Utils.blockPosNearby(newBlockPos, i)).getBlock())) {
                         //degrade and throw this block
-                        Utils.degradeBlock(world, newBlockPos, 1);
+                        Utils.degradeBlock(world, newBlockPos, 1F);
                         Utils.throwBlock(world, newBlockPos,
                                 Utils.motion(Utils.centerOfBlock(newBlockPos), Utils.roundVec3d(explosionPos, 1),
                                         1.0 / (world.getBlockState(newBlockPos).getHarvestLevel() + 2)));
+                    } else {
+                        Utils.degradeBlock(world, newBlockPos, (float)Utils.crackChance);
                     }
                 }
-                //if cant simply degrade
+                //if physics is off
                 else {
-                    Utils.degradeBlock(world, newBlockPos, (float)Utils.crackOutChance);
+                    Utils.degradeBlock(world, newBlockPos, (float)Utils.crackChance);
                 }
             }
             //degrade block which will be exploded
             newBlock = world.getBlockState(blockPos).getBlock();
             if (Utils.canNotBeExploded(newBlock)) continue;
-            Utils.degradeBlock(world, blockPos, (float)Utils.crackInChance);
+            Utils.degradeBlock(world, blockPos, 1F);
         }
         //clear list of degraded blocks
         Utils.degradedBlocksPos.clear();
