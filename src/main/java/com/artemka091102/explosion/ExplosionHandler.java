@@ -26,23 +26,35 @@ public class ExplosionHandler {
         BlockPos newBlockPos;
         Block newBlock;
         for (BlockPos blockPos : blocksPos) {
+            //blocks near given
             for (int i = 0; i < 6; i++) {
+                //getting block
                 newBlockPos = Utils.blockPosNearby(blockPos, i);
                 newBlock = world.getBlockState(newBlockPos).getBlock();
+                //if we cant do anything continue
                 if (Utils.canNotBeExploded(newBlock)) continue;
+                //if we can fly through block behind
                 if (Utils.canPassThrough(world.getBlockState(Utils.blockPosNearby(newBlockPos, i)).getBlock())) {
-                    Utils.degradeBlock(world, newBlockPos, 1);
-                    Utils.throwBlock(world, newBlockPos,
-                            Utils.motion(Utils.centerOfBlock(newBlockPos), Utils.roundVec3d(explosionPos, 1),
-                                    1.0 / (world.getBlockState(newBlockPos).getHarvestLevel() + 2)));
-                } else {
+                    //if physics is off exit
+                    if(Utils.physics) {
+                        //degrade and throw this block
+                        Utils.degradeBlock(world, newBlockPos, 1);
+                        Utils.throwBlock(world, newBlockPos,
+                                Utils.motion(Utils.centerOfBlock(newBlockPos), Utils.roundVec3d(explosionPos, 1),
+                                        1.0 / (world.getBlockState(newBlockPos).getHarvestLevel() + 2)));
+                    }
+                }
+                //if cant simply degrade
+                else {
                     Utils.degradeBlock(world, newBlockPos, 0.5F);
                 }
             }
+            //degrade block which will be exploded
             newBlock = world.getBlockState(blockPos).getBlock();
             if (Utils.canNotBeExploded(newBlock)) continue;
             Utils.degradeBlock(world, blockPos, 1);
         }
+        //clear list of degraded blocks
         Utils.degradedBlocksPos.clear();
     }
 }

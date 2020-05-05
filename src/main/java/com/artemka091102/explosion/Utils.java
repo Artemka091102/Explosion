@@ -5,6 +5,7 @@ package com.artemka091102.explosion;
 import java.util.HashSet;
 import java.util.Objects;
 
+import com.artemka091102.explosion.config.Settings;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
@@ -19,6 +20,8 @@ import net.minecraft.world.World;
 public class Utils {
 
     public static final HashSet<BlockPos> degradedBlocksPos = new HashSet<>();
+
+    public static final boolean physics = Settings.physics.get();
 
     /**
      * Writes something to chat
