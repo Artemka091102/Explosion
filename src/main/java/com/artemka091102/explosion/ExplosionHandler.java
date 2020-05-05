@@ -46,13 +46,13 @@ public class ExplosionHandler {
                 }
                 //if cant simply degrade
                 else {
-                    Utils.degradeBlock(world, newBlockPos, 0.5F);
+                    Utils.degradeBlock(world, newBlockPos, (float)Utils.crackOutChance);
                 }
             }
             //degrade block which will be exploded
             newBlock = world.getBlockState(blockPos).getBlock();
             if (Utils.canNotBeExploded(newBlock)) continue;
-            Utils.degradeBlock(world, blockPos, 1);
+            Utils.degradeBlock(world, blockPos, (float)Utils.crackInChance);
         }
         //clear list of degraded blocks
         Utils.degradedBlocksPos.clear();
