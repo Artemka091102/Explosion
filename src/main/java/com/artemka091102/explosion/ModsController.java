@@ -41,6 +41,7 @@ public class ModsController {
     public static void onCommonSetup(FMLLoadCompleteEvent event) {
         Minecraft.Setup();
         WildNature.Setup();
+        ExtraCobble.Setup();
         acceptChanges = false;
     }
 }
