@@ -40,6 +40,11 @@ public class ExplosionHandler {
                         Utils.throwBlock(world, newBlockPos,
                                 Utils.motion(Utils.centerOfBlock(newBlockPos), Utils.roundVec3d(explosionPos, 1),
                                         1.0 / (world.getBlockState(newBlockPos).getHarvestLevel() + 2)));
+                    //or if we can fall
+                    } else if (Utils.canPassThrough(world.getBlockState(Utils.blockPosNearby(newBlockPos, 4)).getBlock())) {
+                        //degrade and fall this block
+                        Utils.degradeBlock(world, newBlockPos, 1F);
+                        Utils.throwBlock(world, newBlockPos, Vec3d.ZERO);
                     } else {
                         Utils.degradeBlock(world, newBlockPos, (float)Utils.crackChance);
                     }
