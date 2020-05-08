@@ -22,6 +22,7 @@ public class Utils {
     public static final HashSet<BlockPos> degradedBlocksPos = new HashSet<>();
 
     public static final boolean physics = Settings.physics.get();
+    public static final boolean fallBlocks = Settings.fallBlocks.get();
     public static final double crackChance = Settings.crackChance.get();
 
     /**
