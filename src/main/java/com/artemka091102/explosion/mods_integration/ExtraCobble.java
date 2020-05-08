@@ -15,6 +15,8 @@ public class ExtraCobble {
         putToCrackedDict("extracobble:chiseled_andesite_bricks", "extracobble:andesite_bricks");
         putToCrackedDict("extracobble:andesite_bricks", "extracobble:cracked_andesite_bricks");
         putToCrackedDict("extracobble:cracked_andesite_bricks", "extracobble:andesite_cobble");
+        putToCrackedDict("minecraft:andesite_wall", "extracobble:andesite_cobble_wall");
+        putToCrackedDict("extracobble:andesite_cobble_wall", "extracobble:andesite_sand");
         //Mossy Andesite
         putToCrackedDict("extracobble:mossy_andesite_cobble", "extracobble:andesite_gravel");
         //Diorite
@@ -26,6 +28,8 @@ public class ExtraCobble {
         putToCrackedDict("extracobble:chiseled_diorite_bricks", "extracobble:diorite_bricks");
         putToCrackedDict("extracobble:diorite_bricks", "extracobble:cracked_diorite_bricks");
         putToCrackedDict("extracobble:cracked_diorite_bricks", "extracobble:diorite_cobble");
+        putToCrackedDict("minecraft:diorite_wall", "extracobble:diorite_cobble_wall");
+        putToCrackedDict("extracobble:diorite_cobble_wall", "extracobble:diorite_sand");
         //Mossy Diorite
         putToCrackedDict("extracobble:mossy_diorite_cobble", "extracobble:diorite_gravel");
         //Granite
@@ -37,6 +41,9 @@ public class ExtraCobble {
         putToCrackedDict("extracobble:chiseled_granite_bricks", "extracobble:granite_bricks");
         putToCrackedDict("extracobble:diorite_bricks", "extracobble:cracked_diorite_bricks");
         putToCrackedDict("extracobble:cracked_diorite_bricks", "extracobble:diorite_cobble");
+        putToCrackedDict("extracobble:cracked_diorite_bricks", "extracobble:diorite_cobble");
+        putToCrackedDict("minecraft:granite_wall", "extracobble:granite_cobble_wall");
+        putToCrackedDict("extracobble:granite_cobble_wall", "extracobble:granite_sand");
         //Mossy Granite
         putToCrackedDict("extracobble:mossy_granite_cobble", "extracobble:granite_gravel");
         //Stone
